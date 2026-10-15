@@ -10,6 +10,10 @@ workspace**, and writes a reusable **Dependency Exit Capsule** that says exactly
 Built for the hackathon's Track 1 (Gemma 4: Dependency Resilience). The target repository is
 [rishrek/LinkWatch](https://github.com/rishrek/LinkWatch), which is analysed dynamically. No findings are hard-coded.
 
+**Requirement audit:** [docs/COMPLIANCE.md](docs/COMPLIANCE.md) maps every Track 1 requirement and capsule field
+to where it is implemented, with the executed results for all 10 at-risk LinkWatch dependencies.
+**Demo flow:** [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
+
 ## Two ways to use it: CLI and browser
 
 GhostLib is **one Python engine with two front doors**. Both produce identical results and artifacts.

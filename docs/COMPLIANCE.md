@@ -35,7 +35,20 @@ the commands in the README. Nothing is hard-coded.
 
 ## Experiment results (run `20261015T082337Z-f52f393`)
 
-RESULTS_TABLE
+| Package | Candidate | Python | Before (original) | After (candidate) | Verdict | Gemma-written tests |
+|---|---|---|---|---|---|---|
+| `appdirs` | `platformdirs==4.13.0` | 3.12.14 | 1 failed, 9 passed, 1 warning in 10.80s | 1 failed, 9 passed, 1 warning in 9.22s | no regressions but failures remain (fixed 0, regressions 0) | tests_failed: 2 failed, 2 passed, 1 warning in 0.66s |
+| `chardet` | `chardet==7.6.0` | 3.12.14 | 1 failed, 9 passed, 1 warning in 10.80s | 1 failed, 9 passed, 2 warnings in 10.73s | no regressions but failures remain (fixed 0, regressions 0) | passed: 5 passed, 2 warnings in 0.59s |
+| `idna` | `idna==3.20` | 3.12.14 | 1 failed, 9 passed, 1 warning in 10.80s | 1 failed, 9 passed, 1 warning in 9.42s | no regressions but failures remain (fixed 0, regressions 0) | none written |
+| `jinja2` | `Jinja2==3.1.6` | 3.13.7 | 1 failed, 9 passed, 2 warnings in 11.34s | 10 passed, 2 warnings in 9.71s | no regressions observed (fixed 1, regressions 0) | none written |
+| `nose` | `pytest==9.1.1` | 3.12.14 | 1 failed, 9 passed, 1 warning in 10.80s | 1 failed, 9 passed, 1 warning in 9.96s | no regressions but failures remain (fixed 0, regressions 0) | none written |
+| `pydantic` | `pydantic==2.14.1` | 3.12.14 | 1 failed, 9 passed, 1 warning in 10.80s | 1 failed, 9 passed, 1 warning in 9.27s | no regressions but failures remain (fixed 0, regressions 0) | passed: 5 passed, 1 warning in 0.10s |
+| `requests` | `requests==2.34.2` | 3.12.14 | 1 failed, 9 passed, 1 warning in 10.80s | 1 failed, 9 passed, 1 warning in 9.30s | no regressions but failures remain (fixed 0, regressions 0) | tests_failed: 1 failed, 2 passed, 1 warning in 0.69s |
+| `setuptools` | `importlib.resources (stdlib)` | 3.12.14 | 1 failed, 9 passed, 1 warning in 10.80s | 1 failed, 9 passed in 9.96s | no regressions but failures remain (fixed 0, regressions 0) | passed: 3 passed in 0.20s |
+| `six` | `six (remove)` | 3.12.14 | 1 failed, 9 passed, 1 warning in 10.80s | 1 failed, 9 passed, 1 warning in 9.33s | no regressions but failures remain (fixed 0, regressions 0) | none written |
+| `toml` | `tomllib (stdlib)` | 3.12.14 | 1 failed, 9 passed, 1 warning in 10.80s | 1 failed, 9 passed, 1 warning in 10.70s | no regressions but failures remain (fixed 0, regressions 0) | collection_error: 1 warning, 1 error in 1.30s |
+
+In every experiment the original repository was verified unchanged afterwards (git status + manifest hashes). The one remaining failure everywhere is `test_report`, caused by the Jinja2 2.11.3 pin. Only the jinja2 experiment changes that pin, and it fixes the test.
 
 ## Known limitations (stated, not hidden)
 

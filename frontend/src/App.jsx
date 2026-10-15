@@ -120,12 +120,13 @@ function Overview({ run, runs, openRun, scan, go }) {
         </form>
         {runs.length > 0 && <>
           <h3>Previous runs</h3>
-          {runs.slice(0, 6).map((r) => (
+          <p className="muted small">Newest first. Runs with experiments hold the full evidence (tests actually executed).</p>
+          <div className="runlist">{runs.map((r) => (
             <button key={r.run_id} className={`row runrow ${run?.run_id === r.run_id ? "on" : ""}`} onClick={() => openRun(r.run_id)}>
               <code>{r.run_id}</code><span className="muted ellipsis">{r.repository}</span>
-              <span className="muted">{r.packages} packages</span><span className="muted">{(r.commit || "").slice(0, 7)}</span>
+              <span className="muted">{r.recommendations} AI · {r.experiments_completed} tested</span><span className="muted">{(r.commit || "").slice(0, 7)}</span>
             </button>
-          ))}
+          ))}</div>
         </>}
       </section>
 

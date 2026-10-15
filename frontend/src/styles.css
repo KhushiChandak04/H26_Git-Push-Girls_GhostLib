@@ -183,3 +183,6 @@ table.cmp tr.tone-good td{background:#1d2a1f}table.cmp tr.tone-bad td{background
 .stepbox,.ai,details.more{min-width:0;max-width:100%}
 pre{max-width:100%}
 .fname{display:inline-block;max-width:100%;overflow-wrap:anywhere;vertical-align:bottom}
+
+.runlist{max-height:330px;overflow-y:auto}
+@media (max-width:900px){table.cmp{display:block;overflow-x:auto;max-width:100%}}

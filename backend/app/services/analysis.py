@@ -80,8 +80,18 @@ def list_runs() -> list[dict]:
                 scan = _read(scan_file)
             except (OSError, ValueError):
                 continue
+            exp_dir, rec_dir = path / "experiments", path / "recommendations"
+            completed = 0
+            for f in exp_dir.glob("*/experiment.json") if exp_dir.is_dir() else []:
+                try:
+                    completed += _read(f).get("state") == "completed"
+                except (OSError, ValueError):
+                    pass
             out.append({"run_id": path.name, "repository": scan.get("repository"), "created_at": scan.get("created_at"),
-                        "commit": (scan.get("git") or {}).get("commit"), "packages": len(scan.get("packages", []))})
+                        "commit": (scan.get("git") or {}).get("commit"), "packages": len(scan.get("packages", [])),
+                        "recommendations": len(list(rec_dir.glob("*.json"))) if rec_dir.is_dir() else 0,
+                        "experiments_completed": completed,
+                        "input": (scan.get("input") or {}).get("source", "local")})
     return out
 
 
