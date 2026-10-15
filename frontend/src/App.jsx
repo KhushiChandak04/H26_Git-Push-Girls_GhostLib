@@ -114,6 +114,10 @@ function Overview({ run, runs, openRun, scan, go }) {
     setBusy(true); storage.set("ghostlib.repo", repo);
     try { await scan(repo, fetchMeta, mode); } finally { setBusy(false); }
   };
+  const changeRepository = (value) => {
+    setRepo(value);
+    if (value.trim()) setMode(isUrl(value) ? "github" : "local");
+  };
 
   return (
     <>
@@ -139,10 +143,10 @@ function Overview({ run, runs, openRun, scan, go }) {
                 onClick={() => setMode(key)}>{m.label}</button>))}
           </div>
           <label className="field">{MODES[mode].label}
-            <input value={repo} onChange={(e) => setRepo(e.target.value)} placeholder={MODES[mode].placeholder} required aria-invalid={!!problem} />
+            <input value={repo} onChange={(e) => changeRepository(e.target.value)} placeholder={MODES[mode].placeholder} required aria-invalid={!!problem} />
           </label>
           <p className="muted small">{MODES[mode].help}</p>
-          {problem && <p className="note">{problem}</p>}
+          {problem && <p className="note repo-input-error" role="alert">{problem}</p>}
           <label className="check"><input type="checkbox" checked={fetchMeta} onChange={(e) => setFetchMeta(e.target.checked)} />
             Fetch PyPI metadata (network; cached 24 h)</label>
           <div className="actions">
