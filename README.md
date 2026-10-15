@@ -24,6 +24,28 @@ The dashboard runs **locally**. It is not a hosted website: the backend reads th
 tests in temporary copies there. Nothing is uploaded except the evidence sent to Gemma 4 when you ask for a
 recommendation.
 
+### Use it on your own project, right where you work
+
+```bash
+pip install -e /path/to/H26_Git-Push-Girls_GhostLib   # once; Python 3.12 or 3.13
+cd /path/to/your-project
+ghostlib scan                     # scans the current folder; findings print as clickable file:line
+ghostlib scan --format problems   # file:line:col: severity: message (compiler style)
+ghostlib ui                       # dashboard + API on http://127.0.0.1:8000 (run `npm --prefix frontend run build` once)
+ghostlib scan https://github.com/rishrek/LinkWatch   # or a public GitHub URL (shallow-cloned into artifacts/clones/)
+```
+
+**VS Code:** copy [`integrations/vscode/tasks.json`](integrations/vscode/tasks.json) to `<your-project>/.vscode/tasks.json`.
+Then press `Ctrl+Shift+P`, choose **Tasks: Run Task**, then **GhostLib: scan this workspace**. Every finding
+(risky declarations, private-API calls, undeclared imports) appears in the **Problems** panel, and clicking one
+jumps to the exact line. The same file also has tasks to open the dashboard and to show what GhostLib has learned.
+No extension needs to be installed. Applying a migration also happens in VS Code: the Migration tab's
+*Open patch in VS Code* button, or `git apply <patch>`.
+
+**Input rules:** the main input is a local repository path. A public `https://github.com/<owner>/<repo>` URL is also
+accepted and shallow-cloned without prompting for credentials. Other hosts, private repositories and files give a
+clear error asking for a local path.
+
 ## Evidence labels
 
 Every statement in the dashboard and the capsule carries one of these labels:

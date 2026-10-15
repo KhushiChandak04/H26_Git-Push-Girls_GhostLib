@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes import runs
@@ -16,3 +19,9 @@ app.include_router(runs.router)
 @app.get("/health")
 def health():
     return {"status": "ok", "project": "GhostLib"}
+
+
+# `ghostlib ui`: serve the built dashboard (frontend/dist) from the same origin as the API.
+_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+if _DIST.is_dir():
+    app.mount("/", StaticFiles(directory=_DIST, html=True), name="dashboard")

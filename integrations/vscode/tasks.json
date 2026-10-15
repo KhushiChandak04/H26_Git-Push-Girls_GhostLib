@@ -1,0 +1,49 @@
+{
+  // GhostLib tasks for VS Code. Copy this file to <your project>/.vscode/tasks.json
+  // (or merge the tasks into an existing one), then: Ctrl+Shift+P -> "Tasks: Run Task".
+  // Requires `ghostlib` on PATH: pip install -e <path-to-GhostLib>  (Python 3.12 or 3.13).
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "GhostLib: scan this workspace",
+      "detail": "Dependency risks -> Problems panel (click a finding to jump to the line)",
+      "type": "shell",
+      "command": "ghostlib",
+      "args": ["scan", "${workspaceFolder}", "--format", "problems"],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "problemMatcher": {
+        "owner": "ghostlib",
+        "source": "GhostLib",
+        "fileLocation": "absolute",
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+):\\s+(error|warning|info):\\s+(.*)$",
+          "file": 1, "line": 2, "column": 3, "severity": 4, "message": 5
+        }
+      }
+    },
+    {
+      "label": "GhostLib: scan this workspace (readable report)",
+      "type": "shell",
+      "command": "ghostlib",
+      "args": ["scan", "${workspaceFolder}"],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "GhostLib: open dashboard",
+      "detail": "Starts the GhostLib dashboard + API and opens the browser",
+      "type": "shell",
+      "command": "ghostlib",
+      "args": ["ui"],
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "GhostLib: what has it learned?",
+      "type": "shell",
+      "command": "ghostlib",
+      "args": ["learn"],
+      "problemMatcher": []
+    }
+  ]
+}

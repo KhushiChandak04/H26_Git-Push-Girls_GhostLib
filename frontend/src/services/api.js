@@ -1,5 +1,8 @@
 // VITE_API_URL = backend origin (e.g. http://127.0.0.1:8000); VITE_API_BASE = full API base (overrides).
-const ORIGIN = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+// When served by `ghostlib ui` the API is on the same origin; under `npm run dev` (port 5173) it is on :8000.
+const DEFAULT_ORIGIN = typeof window !== "undefined" && window.location.port !== "5173" && window.location.protocol.startsWith("http")
+  ? window.location.origin : "http://127.0.0.1:8000";
+const ORIGIN = (import.meta.env.VITE_API_URL || DEFAULT_ORIGIN).replace(/\/$/, "");
 export const API_BASE = import.meta.env.VITE_API_BASE || `${ORIGIN}/api`;
 
 async function request(path, options = {}) {

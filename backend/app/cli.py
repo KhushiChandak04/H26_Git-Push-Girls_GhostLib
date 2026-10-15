@@ -1,6 +1,8 @@
 """GhostLib command-line interface.
 
-    ghostlib scan PATH [--no-metadata] [--recommend] [--min-score N]
+    ghostlib scan [PATH|GITHUB_URL] [--format text|problems] [--no-metadata] [--recommend]
+        (PATH defaults to the current folder, so `ghostlib scan` works inside any project)
+    ghostlib ui [--port 8000]       start the dashboard + API on one port and open the browser
     ghostlib recommend RUN_ID (PACKAGE | --all)
     ghostlib experiment RUN_ID PACKAGE [--candidate NAME --kind KIND] [--approve | --reject] [--python 3.12]
     ghostlib capsule RUN_ID
@@ -18,7 +20,7 @@ import sys
 from app.services import agent, analysis, experiment, gemma, memory
 from app.services.capsule import generate_for_run
 
-COMMANDS = {"scan", "recommend", "experiment", "capsule", "runs", "ai-check", "auto", "learn"}
+COMMANDS = {"scan", "recommend", "experiment", "capsule", "runs", "ai-check", "auto", "learn", "ui"}
 
 
 def _print(data) -> None:
@@ -33,6 +35,11 @@ def cmd_scan(args) -> int:
     run = analysis.create_run(target["path"], fetch_metadata=not args.no_metadata)
     analysis.set_input_info(run["run_id"], target)
     rid = run["run_id"]
+    if args.format == "problems":
+        for line in problem_lines(run):
+            print(line)
+        generate_for_run(rid)
+        return 0
     print(f"Run {rid}: {len(run['manifests'])} manifests, {len(run['packages'])} packages, "
           f"{run['source_files_scanned']} Python files scanned (commit {(run.get('git') or {}).get('commit')})")
     print(f"{'score':>5}  {'band':<7} {'package':<18} indicators")
@@ -46,11 +53,61 @@ def cmd_scan(args) -> int:
     for c in run["declaration_conflicts"]:
         print(f"  conflicting declarations: {c['package']} "
               + "; ".join(f"{d['source']} {d['specifier']}" for d in c["declarations"]))
+    root = run["repository"]
+    risky = [p for p in run["packages"] if p["assessment"]["score"] > 0]
+    if risky:
+        print("\nWhere the risky packages are used (Ctrl+click in the VS Code terminal):")
+        for pkg in risky:
+            for loc in pkg["locations"][:3]:
+                print(f"  {_norm(root, loc['file'])}:{loc['line']}  [{pkg['normalized_name']}] {loc['statement']}")
     if args.recommend:
         print("Requesting Gemma 4 recommendations...")
         _print(analysis.recommend_all(rid, min_score=args.min_score))
     files = generate_for_run(rid)["files"]
     print("Capsule:", *files, sep="\n  ")
+    return 0
+
+
+def _norm(root: str, rel: str) -> str:
+    import os
+    return os.path.normpath(os.path.join(root, rel))
+
+
+def problem_lines(run: dict) -> list[str]:
+    """Findings as `file:line:col: severity: message`, the format VS Code problem matchers read."""
+    import os
+    root = run["repository"]
+    sev = {"high": "error", "medium": "warning", "low": "info"}
+    lines = []
+    for pkg in run["packages"]:
+        a = pkg["assessment"]
+        if a["score"] <= 0:
+            continue
+        reasons = "; ".join(i["indicator"].replace("_", " ") for i in a["indicators"] if i["points"] > 0)
+        for d in pkg["declarations"]:
+            path = os.path.normpath(os.path.join(root, d["source"]))
+            lines.append(f"{path}:{d.get('line') or 1}:1: {sev[a['band']]}: [GhostLib] {pkg['normalized_name']} "
+                         f"risk {a['score']} ({a['band']}): {reasons}")
+        for loc in pkg["locations"]:
+            if loc["private_api"]:
+                lines.append(f"{os.path.normpath(os.path.join(root, loc['file']))}:{loc['line']}:1: warning: [GhostLib] {pkg['normalized_name']}: "
+                             f"private API {', '.join(loc['private_api'])} may break on upgrade")
+    for u in run["undeclared_imports"]:
+        for loc in u["locations"]:
+            lines.append(f"{os.path.normpath(os.path.join(root, loc['file']))}:{loc['line']}:1: warning: [GhostLib] '{u['import_name']}' "
+                         "is imported but not declared in any manifest")
+    return lines
+
+
+def cmd_ui(args) -> int:
+    import threading
+    import webbrowser
+    import uvicorn
+    url = f"http://127.0.0.1:{args.port}"
+    print(f"GhostLib dashboard + API on {url}  (Ctrl+C to stop)")
+    if not args.no_browser:
+        threading.Timer(1.5, lambda: webbrowser.open(url)).start()
+    uvicorn.run("app.main:app", host="127.0.0.1", port=args.port, log_level="warning")
     return 0
 
 
@@ -133,7 +190,9 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("scan", help="Scan a repository, fetch PyPI metadata, assess risk, write a capsule")
-    p.add_argument("repository")
+    p.add_argument("repository", nargs="?", default=".", help="Local folder (default: current folder) or GitHub URL")
+    p.add_argument("--format", choices=["text", "problems"], default="text",
+                   help="'problems' prints file:line findings for the VS Code Problems panel")
     p.add_argument("--no-metadata", action="store_true", help="Skip PyPI requests")
     p.add_argument("--recommend", action="store_true", help="Also request Gemma 4 recommendations")
     p.add_argument("--min-score", type=int, default=1)
@@ -175,6 +234,11 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("capsule", help="(Re)generate capsule.json and capsule.md for a run")
     p.add_argument("run_id")
     p.set_defaults(func=lambda a: (print(*generate_for_run(a.run_id)["files"], sep="\n"), 0)[1])
+
+    p = sub.add_parser("ui", help="Start the dashboard and API together, then open the browser")
+    p.add_argument("--port", type=int, default=8000)
+    p.add_argument("--no-browser", action="store_true")
+    p.set_defaults(func=cmd_ui)
 
     p = sub.add_parser("runs", help="List analysis runs")
     p.set_defaults(func=lambda a: (_print(analysis.list_runs()), 0)[1])
