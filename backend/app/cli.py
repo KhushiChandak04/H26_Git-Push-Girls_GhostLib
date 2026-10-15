@@ -42,7 +42,7 @@ def cmd_scan(args) -> int:
         print(f"  conflicting declarations: {c['package']} "
               + "; ".join(f"{d['source']} {d['specifier']}" for d in c["declarations"]))
     if args.recommend:
-        print("Requesting Gemma 4 recommendations…")
+        print("Requesting Gemma 4 recommendations...")
         _print(analysis.recommend_all(rid, min_score=args.min_score))
     files = generate_for_run(rid)["files"]
     print("Capsule:", *files, sep="\n  ")
@@ -74,7 +74,7 @@ def cmd_experiment(args) -> int:
         print("Review the diff above. Re-run with --approve to execute baseline and candidate tests, "
               "or --reject to discard.")
         return 0
-    print(f"Approved. Running baseline and candidate tests on Python {args.python}…")
+    print(f"Approved. Running baseline and candidate tests on Python {args.python}...")
     record = experiment.approve_and_run(args.run_id, args.package, approved_by="cli user", python=args.python)
     if record["state"] != "completed":
         print("Experiment failed:", record.get("error"))
