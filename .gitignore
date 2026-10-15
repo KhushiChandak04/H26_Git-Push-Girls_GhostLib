@@ -19,5 +19,6 @@ artifacts/*
 .DS_Store
 Thumbs.db
 # Local clones of target repositories (e.g. LinkWatch); never commit them
+targets/
 *.egg-info/
 backend/env
