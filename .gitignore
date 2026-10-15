@@ -20,3 +20,4 @@ artifacts/*
 Thumbs.db
 # Local clones of target repositories (e.g. LinkWatch); never commit them
 *.egg-info/
+backend/env
