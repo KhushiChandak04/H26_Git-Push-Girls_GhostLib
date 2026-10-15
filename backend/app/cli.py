@@ -20,7 +20,7 @@ import sys
 from app.services import agent, analysis, experiment, gemma, memory
 from app.services.capsule import generate_for_run
 
-COMMANDS = {"scan", "recommend", "experiment", "capsule", "runs", "ai-check", "auto", "learn", "ui"}
+COMMANDS = {"advisories", "scan", "recommend", "experiment", "capsule", "runs", "ai-check", "auto", "learn", "ui"}
 
 
 def _print(data) -> None:
@@ -239,6 +239,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--port", type=int, default=8000)
     p.add_argument("--no-browser", action="store_true")
     p.set_defaults(func=cmd_ui)
+
+    p = sub.add_parser("advisories", help="(Re)check known vulnerabilities (OSV.dev) for a run's pinned versions")
+    p.add_argument("run_id")
+    p.set_defaults(func=lambda a: (_print(analysis.refresh_advisories(a.run_id)), generate_for_run(a.run_id), 0)[2])
 
     p = sub.add_parser("runs", help="List analysis runs")
     p.set_defaults(func=lambda a: (_print(analysis.list_runs()), 0)[1])

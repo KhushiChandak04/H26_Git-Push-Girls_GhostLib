@@ -33,8 +33,8 @@ export const api = {
   learning: () => request("/learning"),
   listRuns: () => request("/runs"),
   getRun: (id) => request(`/runs/${id}`),
-  createRun: (repository, fetchMetadata = true) =>
-    request("/runs", { method: "POST", body: { repository, fetch_metadata: fetchMetadata } }),
+  createRun: (repository, fetchMetadata = true, mode = null) =>
+    request("/runs", { method: "POST", body: { repository, fetch_metadata: fetchMetadata, mode } }),
   source: (id, file, line, context = 4) =>
     request(`/runs/${id}/source?file=${encodeURIComponent(file)}&line=${line}&context=${context}`),
   recommend: (id, pkg) => request(`/runs/${id}/recommendations/${pkg}`, { method: "POST" }),
@@ -42,6 +42,8 @@ export const api = {
   approve: (id, pkg, body) => request(`/runs/${id}/experiments/${pkg}/approve`, { method: "POST", body }),
   reject: (id, pkg, reason) => request(`/runs/${id}/experiments/${pkg}/reject`, { method: "POST", body: { reason } }),
   experiment: (id, pkg) => request(`/runs/${id}/experiments/${pkg}`),
+  openInEditor: (id, file, line = 1, scope = "repo") =>
+    request(`/runs/${id}/open`, { method: "POST", body: { file, line, scope } }),
   capsule: (id) => request(`/runs/${id}/capsule`, { method: "POST" }),
   capsuleUrl: (id, fmt) => `${API_BASE}/runs/${id}/capsule.${fmt}`,
   logUrl: (id, pkg, name, side) => `${API_BASE}/runs/${id}/experiments/${pkg}/logs/${name}?side=${side}`,

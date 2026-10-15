@@ -186,3 +186,9 @@ pre{max-width:100%}
 
 .runlist{max-height:330px;overflow-y:auto}
 @media (max-width:900px){table.cmp{display:block;overflow-x:auto;max-width:100%}}
+.opener{display:inline-flex;gap:.4rem;align-items:center;flex-wrap:wrap}
+.usage-h .opener{margin-left:auto}
+.modes{display:inline-flex;border:2px solid var(--bone);border-radius:999px;padding:3px;margin:0 0 1rem;gap:3px;flex-wrap:wrap}
+.mode{background:none;border:0;border-radius:999px;padding:.45rem 1rem;color:var(--bone);font-weight:600}
+.mode.on{background:var(--bone);color:var(--plum)}
+.scan input[aria-invalid=true]{border-color:var(--blood)}

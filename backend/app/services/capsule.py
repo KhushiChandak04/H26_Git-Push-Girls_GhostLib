@@ -107,6 +107,7 @@ def build_capsule(run: dict) -> dict:
             "usage": {"evidence_type": "OBSERVED", "import_names": pkg.get("import_names"),
                       "mapping_confidence": pkg.get("mapping_confidence"), **(pkg.get("usage") or {}),
                       "locations": pkg.get("locations", [])},
+            "advisories": _advisories_view(pkg, exp),
             "recommendation": _recommendation_view(rec),
             "experiment": _experiment_summary(exp) if exp else {"state": "not_run"},
             "compatibility_gaps": _compat_gaps(pkg, exp, run.get("python_requirement")),
@@ -129,13 +130,18 @@ def build_capsule(run: dict) -> dict:
                         "experiment_pythons": sorted({(e.get("candidate_run") or {}).get("python_version") or "?" for e in experiments_done})},
         "ai": {**gemma.model_info(), "used_for": ["replacement recommendations", "code change proposals"],
                "recommendations": {k: v.get("status") for k, v in recs.items()},
-               "calls": ai_calls(recs, exps)},
+               "calls": run.get("ai_call_log") or ai_calls(recs, exps),
+               "call_log_source": "ai_calls.jsonl (append-only, includes failed calls)" if run.get("ai_call_log")
+                                  else "derived from saved recommendation/proposal files (latest per package)"},
+        "run_status": run.get("run_status"),
         "summary": {
             "manifests": [m["path"] for m in run.get("manifests", [])],
             "packages": len(deps),
             "by_band": {b: [d["package"] for d in deps if d["risk"]["band"] == b] for b in ("high", "medium", "low", "none")},
             "ai_recommendations_ok": sum(1 for r in recs.values() if r.get("status") == "ok"),
             "experiments_completed": len(experiments_done),
+            "known_advisories": {d["package"]: d["advisories"].get("unique_issues") for d in deps
+                                 if d["advisories"].get("status") == "checked" and d["advisories"].get("count")},
         },
         "repository_findings": {
             "evidence_type": "OBSERVED",
@@ -171,7 +177,8 @@ def build_capsule(run: dict) -> dict:
 
 def _call_record(kind: str, package: str, r: dict) -> dict:
     usage = r.get("usage") or {}
-    return {"purpose": kind, "package": package, "status": r.get("status"), "model_requested": r.get("model"),
+    return {"call_id": r.get("call_id"), "purpose": kind, "package": package, "status": r.get("status"),
+            "error": r.get("reason") if r.get("status") != "ok" else None, "model_requested": r.get("model"),
             "model_version_returned": r.get("model_version"), "requested_at": r.get("requested_at"),
             "latency_seconds": r.get("latency_seconds"), "prompt_tokens": usage.get("promptTokenCount"),
             "output_tokens": usage.get("candidatesTokenCount"), "thought_tokens": usage.get("thoughtsTokenCount"),
@@ -189,10 +196,23 @@ def ai_calls(recs: dict, exps: dict) -> list[dict]:
     return sorted(calls, key=lambda c: c.get("requested_at") or "")
 
 
+def _advisories_view(pkg: dict, exp: dict | None) -> dict:
+    from app.services.advisories import resolved_by
+    adv = dict(pkg.get("advisories") or {"status": "not_checked", "evidence_type": "UNKNOWN",
+                                          "reason": "Run predates advisory checks."})
+    if exp and exp.get("state") == "completed" and (exp.get("manifest_requirement") or "").count("==") == 1:
+        adv["candidate_resolution"] = resolved_by(adv, exp["manifest_requirement"].split("==", 1)[1])
+    elif exp and exp.get("state") == "completed" and exp.get("kind") in ("stdlib", "remove"):
+        adv["candidate_resolution"] = {"resolved": [v["id"] for v in adv.get("vulnerabilities", [])], "not_resolved": [],
+                                       "note": "The candidate removes this package's runtime declaration. Build-time requirements "
+                                               "(e.g. [build-system] requires) are not changed by GhostLib."}
+    return adv
+
+
 def _recommendation_view(rec: dict | None) -> dict:
     if not rec:
         return {"evidence_type": "AI-RECOMMENDED", "status": "not_requested"}
-    view = {"evidence_type": "AI-RECOMMENDED", "status": rec.get("status"), "reason": rec.get("reason"),
+    view = {"evidence_type": "AI-RECOMMENDED", "call_id": rec.get("call_id"), "status": rec.get("status"), "reason": rec.get("reason"),
             "model": rec.get("model"), "model_version": rec.get("model_version"),
             "inference_method": rec.get("inference_method"), "requested_at": rec.get("requested_at"),
             "prompt_sha256": rec.get("prompt_sha256")}
@@ -286,6 +306,17 @@ def capsule_markdown(c: dict) -> str:
                      f" — <{m.get('source')}> (retrieved {(m.get('retrieved_at') or '')[:19]})")
         else:
             L.append(f"**PyPI [UNKNOWN]:** {m.get('status')} {m.get('reason') or ''}")
+        adv = d.get("advisories") or {}
+        if adv.get("status") == "checked":
+            ids = ", ".join(f"[{v['id']}]({v['url']})" for v in adv.get("vulnerabilities", [])) or "none"
+            L.append(f"**Known vulnerabilities [SOURCED, OSV.dev, not part of the risk score]:** "
+                     f"{adv.get('unique_issues', 0)} unique issue(s) for {adv.get('version')}: {ids}")
+            cr = adv.get("candidate_resolution")
+            if cr:
+                L.append(f"- Candidate resolves {len(cr['resolved'])} of {len(cr['resolved']) + len(cr['not_resolved'])} "
+                         f"advisory IDs ({cr['note']})")
+        else:
+            L.append(f"**Known vulnerabilities [UNKNOWN]:** {adv.get('status')}: {adv.get('reason', '')}")
         L += ["", "**Risk indicators:**"]
         L += [f"- [{i['evidence_type']}] `{i['indicator']}` (+{i['points']}): {i['evidence']}" for i in r["indicators"]] or ["- none"]
         u = d["usage"]
@@ -373,6 +404,7 @@ def write_capsule(capsule: dict, output_dir: Path | str) -> list[str]:
 def generate_for_run(run_id: str) -> dict:
     from app.services import analysis
     run = analysis.get_run(run_id)
+    run["ai_call_log"] = analysis.read_ai_calls(run_id)
     capsule = build_capsule(run)
     files = write_capsule(capsule, analysis.run_dir(run_id) / "capsule")
     return {"capsule": capsule, "files": files}

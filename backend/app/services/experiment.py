@@ -393,6 +393,9 @@ def propose(run_id: str, package: str, candidate: str | None = None, kind: str |
 
     edir = rdir / "experiments" / package
     edir.mkdir(parents=True, exist_ok=True)
+    if code_proposal.get("call_id"):
+        analysis.log_ai_call(run_id, "code change proposal", package, code_proposal,
+                             f"experiments/{package}/proposal.diff")
     diff = _diff(repo, edits)
     (edir / "proposal.diff").write_text(diff, encoding="utf-8")
     record = {

@@ -48,11 +48,19 @@ def _read(path: Path):
 
 def create_run(repository: str | Path, *, fetch_metadata: bool = True) -> dict:
     scan = scan_repository(repository)
+    if not scan["manifests"] and scan["source_files_scanned"] == 0:
+        raise ValueError(f"No Python project found at {scan['repository']}: 0 dependency manifests and 0 .py files "
+                         "(after skipping .git, venvs, node_modules and build folders). Check that the path is the "
+                         "repository's top folder. Nothing was saved.")
     metadata = fetch_all(scan["packages"]) if fetch_metadata else {}
+    from app.services import advisories
+    vulns = advisories.check(scan["packages"]) if fetch_metadata else {}
     for pkg in scan["packages"]:
         meta = metadata.get(pkg["normalized_name"])
         pkg["metadata"] = meta or {"status": "not_fetched", "reason": "Metadata fetch disabled for this run."}
         pkg["assessment"] = assess_package(pkg, meta)
+        pkg["advisories"] = vulns.get(pkg["normalized_name"]) or {
+            "status": "not_checked", "evidence_type": "UNKNOWN", "reason": "Network lookups disabled for this run."}
     scan["packages"].sort(key=lambda p: (-p["assessment"]["score"], p["normalized_name"]))
     commit = (scan.get("git") or {}).get("commit") or "nogit"
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + commit[:7]
@@ -61,6 +69,18 @@ def create_run(repository: str | Path, *, fetch_metadata: bool = True) -> dict:
     scan["metadata_fetched"] = fetch_metadata
     _write(runs_dir() / run_id / "scan.json", scan)
     return scan
+
+
+def refresh_advisories(run_id: str) -> dict:
+    """Run the OSV.dev lookup for an existing run's pinned versions and store it on the run."""
+    from app.services import advisories
+    path = run_dir(run_id) / "scan.json"
+    scan = _read(path)
+    results = advisories.check(scan["packages"])
+    for pkg in scan["packages"]:
+        pkg["advisories"] = results.get(pkg["normalized_name"])
+    _write(path, scan)
+    return {k: (v["status"], v.get("unique_issues")) for k, v in results.items()}
 
 
 def set_input_info(run_id: str, target: dict) -> None:
@@ -91,6 +111,7 @@ def list_runs() -> list[dict]:
                         "commit": (scan.get("git") or {}).get("commit"), "packages": len(scan.get("packages", [])),
                         "recommendations": len(list(rec_dir.glob("*.json"))) if rec_dir.is_dir() else 0,
                         "experiments_completed": completed,
+                        "at_risk": sum(1 for p in scan.get("packages", []) if (p.get("assessment") or {}).get("score", 0) > 0),
                         "input": (scan.get("input") or {}).get("source", "local")})
     return out
 
@@ -106,6 +127,7 @@ def get_run(run_id: str) -> dict:
         experiments[f.parent.name] = _read(f)
     scan["recommendations"] = recs
     scan["experiments"] = experiments
+    scan["run_status"] = run_status(scan, recs, experiments)
     from app.services import memory  # local import: memory replays runs via this module
     memory.annotate_run(scan)
     return scan
@@ -118,6 +140,57 @@ def _package(scan: dict, package: str) -> dict:
         if pkg["normalized_name"] == package:
             return pkg
     raise KeyError(f"Package {package} not in run.")
+
+
+def log_ai_call(run_id: str, purpose: str, package: str, result: dict, output_ref: str | None = None) -> None:
+    """Append one Gemma request to the run's audit log (ai_calls.jsonl). Never stores keys; prompt as hash only."""
+    usage = result.get("usage") or {}
+    record = {
+        "call_id": result.get("call_id"), "run_id": run_id, "purpose": purpose, "package": package,
+        "status": result.get("status"), "error": result.get("reason") if result.get("status") != "ok" else None,
+        "model_requested": result.get("model"), "model_version_returned": result.get("model_version"),
+        "inference_method": result.get("inference_method"), "requested_at": result.get("requested_at"),
+        "latency_seconds": result.get("latency_seconds"), "prompt_tokens": usage.get("promptTokenCount"),
+        "output_tokens": usage.get("candidatesTokenCount"), "thought_tokens": usage.get("thoughtsTokenCount"),
+        "finish_reason": result.get("finish_reason"), "prompt_sha256": result.get("prompt_sha256"),
+        "output_ref": output_ref,
+    }
+    with (run_dir(run_id) / "ai_calls.jsonl").open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record) + "\n")
+
+
+def read_ai_calls(run_id: str) -> list[dict] | None:
+    path = run_dir(run_id) / "ai_calls.jsonl"
+    if not path.is_file():
+        return None
+    out = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            continue
+    return out
+
+
+def run_status(scan: dict, recs: dict, experiments: dict) -> dict:
+    """How complete a run is. Only executed experiments count as tested."""
+    at_risk = [p["normalized_name"] for p in scan.get("packages", []) if (p.get("assessment") or {}).get("score", 0) > 0]
+    rec_ok = [k for k, v in recs.items() if v.get("status") == "ok"]
+    tested = [k for k, v in experiments.items() if v.get("state") == "completed"]
+    running = [k for k, v in experiments.items() if v.get("state") == "running"]
+    failed = [k for k, v in experiments.items() if v.get("state") == "failed"]
+    untested = [p for p in at_risk if p not in tested]
+    if running:
+        status = "running"
+    elif at_risk and not untested and all(p in rec_ok for p in at_risk):
+        status = "complete"
+    elif rec_ok or tested:
+        status = "partial"
+    else:
+        status = "scan_only"
+    return {"status": status, "packages": len(scan.get("packages", [])), "at_risk": len(at_risk),
+            "recommendations_ok": len(rec_ok), "experiments_completed": len(tested), "experiments_failed": failed,
+            "untested_at_risk": untested, "running": running}
 
 
 def recommend(run_id: str, package: str) -> dict:
@@ -138,6 +211,8 @@ def recommend(run_id: str, package: str) -> dict:
     if result.get("status") == "ok":
         result["candidate_validation"] = validate_candidates(result["recommendation"], pkg)
     _write(path / "recommendations" / f"{package}.json", result)
+    if result.get("status") != "AI_UNAVAILABLE":
+        log_ai_call(run_id, "replacement recommendation", package, result, f"recommendations/{package}.json")
     return result
 
 

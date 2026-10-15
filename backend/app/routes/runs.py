@@ -25,6 +25,7 @@ def _guard(fn, *args, **kwargs):
 
 class RunRequest(BaseModel):
     repository: str = Field(min_length=1, max_length=1000)
+    mode: str | None = Field(default=None, pattern="^(local|github)$")
     fetch_metadata: bool = True
 
 
@@ -38,6 +39,12 @@ class ApproveRequest(BaseModel):
     confirm: bool
     approved_by: str = Field(default="dashboard user", max_length=100)
     python: str = Field(default="3.12", pattern=r"^3\.1[23]$")
+
+
+class OpenRequest(BaseModel):
+    file: str = Field(min_length=1, max_length=1000)
+    line: int = Field(default=1, ge=1, le=10_000_000)
+    scope: str = Field(default="repo", pattern="^(repo|run)$")
 
 
 class RejectRequest(BaseModel):
@@ -77,7 +84,7 @@ def list_runs():
 @router.post("/runs")
 def create_run(req: RunRequest):
     from app.services.repo_input import resolve
-    target = _guard(resolve, req.repository)
+    target = _guard(resolve, req.repository, req.mode)
     run = _guard(analysis.create_run, target["path"], fetch_metadata=req.fetch_metadata)
     analysis.set_input_info(run["run_id"], target)
     generate_for_run(run["run_id"])
@@ -105,6 +112,17 @@ def source(run_id: str, file: str, line: int = 1, context: int = 8):
     lo, hi = max(1, line - context), min(len(lines), line + context)
     return {"file": file, "line": line, "start": lo,
             "lines": [{"n": n, "text": lines[n - 1]} for n in range(lo, hi + 1)], "evidence_type": "OBSERVED"}
+
+
+@router.post("/runs/{run_id}/open")
+def open_in_editor(run_id: str, req: OpenRequest):
+    from app.services.editor import EditorError, open_in_vscode
+    try:
+        return open_in_vscode(run_id, req.file, req.line, req.scope)
+    except EditorError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(404, str(exc)) from exc
 
 
 @router.post("/runs/{run_id}/recommendations/{package}")

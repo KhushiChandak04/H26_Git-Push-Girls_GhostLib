@@ -36,7 +36,7 @@ cd /path/to/your-project
 ghostlib scan                     # scans the current folder; findings print as clickable file:line
 ghostlib scan --format problems   # file:line:col: severity: message (compiler style)
 ghostlib ui                       # dashboard + API on http://127.0.0.1:8000 (run `npm --prefix frontend run build` once)
-ghostlib scan https://github.com/rishrek/LinkWatch   # or a public GitHub URL (shallow-cloned into artifacts/clones/)
+ghostlib scan https://github.com/rishrek/LinkWatch   # or a public GitHub URL (a fresh shallow clone per scan in artifacts/checkouts/)
 ```
 
 **VS Code:** copy [`integrations/vscode/tasks.json`](integrations/vscode/tasks.json) to `<your-project>/.vscode/tasks.json`.
@@ -46,9 +46,26 @@ jumps to the exact line. The same file also has tasks to open the dashboard and 
 No extension needs to be installed. Applying a migration also happens in VS Code: the Migration tab's
 *Open patch in VS Code* button, or `git apply <patch>`.
 
+**Opening files in VS Code from the dashboard:** the *Open in VS Code* buttons ask the local backend to run
+`code -g <file>:<line>`. A web page cannot launch desktop apps, but the backend runs on your machine. Only files inside
+the scanned repository or the run's own folder can be opened. This needs the `code` command on PATH (VS Code:
+*Shell Command: Install 'code' command in PATH*); if it is missing, the button shows a `vscode://` fallback link.
+
 **Input rules:** the main input is a local repository path. A public `https://github.com/<owner>/<repo>` URL is also
 accepted and shallow-cloned without prompting for credentials. Other hosts, private repositories and files give a
 clear error asking for a local path.
+
+## Known vulnerabilities (separate from the risk score)
+
+For every **exactly pinned** dependency, GhostLib queries [OSV.dev](https://osv.dev). The results are labelled
+SOURCED, linked to each advisory, and deduplicated across aliases (one CVE can have both a GHSA and a PYSEC ID). They
+are **never added to the risk score**: outdated is not the same as vulnerable. Ranges such as `>=2` are reported as
+"not checked" rather than guessed, and an unreachable OSV is reported as "unavailable". For each tested candidate,
+the capsule shows which advisories its version is past the fix for (a version comparison, not a security test).
+`ghostlib advisories <run-id>` re-runs the lookup for an existing run.
+
+On LinkWatch: `Jinja2==2.11.3` has 4 unique issues, `requests==2.31.0` 3, `idna==2.7` 2 and `setuptools==75.8.0` 2. The
+tested candidates are past the fix for all of their advisory IDs.
 
 ## Evidence labels
 

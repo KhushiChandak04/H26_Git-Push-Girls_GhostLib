@@ -25,7 +25,24 @@ const Chip = ({ claim }) => (
 
 const State = ({ value }) => <span className={`state state-${value}`}>{na(value).replaceAll("_", " ")}</span>;
 
-const vscode = (path, line) => `vscode://file/${encodeURI(path.replaceAll("\\", "/"))}:${line}`;
+
+// Asks the local backend to run `code -g file:line`. A browser cannot launch apps itself;
+// the vscode:// link is only offered as a fallback when the backend cannot find VS Code.
+function OpenInVSCode({ runId, file, line, scope = "repo", label = "Open in VS Code", big = false }) {
+  const [state, setState] = useState(null);
+  const open = async () => {
+    setState({ busy: true });
+    try { setState(await api.openInEditor(runId, file, line, scope)); }
+    catch (e) { setState({ opened: false, reason: e.message }); }
+  };
+  return (
+    <span className="opener">
+      <button type="button" className={big ? "btn-bone" : "link"} disabled={state?.busy} onClick={open}>{state?.busy ? "Opening..." : label}</button>
+      {state?.opened && <span className="muted small"> ✓ opened in VS Code</span>}
+      {state && state.opened === false && <span className="muted small"> {state.reason} {state.uri && <a href={state.uri}>try vscode:// link</a>}</span>}
+    </span>
+  );
+}
 
 function Ghost({ className }) {
   return (
@@ -62,18 +79,27 @@ function Diff({ text }) {
 
 /* ------------------------------------------------------------------ Overview */
 
-const isUrl = (v) => /^(https?:\/\/|git@)/i.test((v || "").trim());
-function inputHint(v) {
+const isUrl = (v) => /^(https?:\/\/|git@|ssh:\/\/|git:\/\/|file:\/\/|github\.com\/)/i.test((v || "").trim());
+const GH_RE = /^https:\/\/(www\.)?github\.com\/[A-Za-z0-9][\w.-]*\/[A-Za-z0-9][\w.-]*?(\.git)?\/?$/;
+const MODES = {
+  local: { label: "Local repository path", placeholder: "D:\\GitHub\\LinkWatch", busy: "Scanning...",
+           help: "A folder on this machine. GhostLib reads it and never modifies it." },
+  github: { label: "GitHub repository URL", placeholder: "https://github.com/rishrek/LinkWatch", busy: "Cloning and scanning...",
+            help: "A public github.com repository. The backend makes a fresh shallow clone for this run under artifacts/checkouts/." },
+};
+function inputProblem(mode, v) {
   const t = (v || "").trim();
   if (!t) return "";
-  if (isUrl(t) && !/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+?(\.git)?\/?$/i.test(t))
-    return "Not supported: only public GitHub URLs like https://github.com/owner/repo. For other hosts, clone it and enter the local path.";
-  if (isUrl(t)) return "GitHub URL detected: GhostLib will make a shallow clone into artifacts/clones/ and scan that copy.";
+  if (mode === "local" && isUrl(t)) return "This looks like a URL. Switch to \u201cGitHub repository URL\u201d, or enter a folder path.";
+  if (mode === "github" && !isUrl(t)) return "This looks like a folder path. Switch to \u201cLocal repository path\u201d.";
+  if (mode === "github" && /@/.test(t.split("/")[2] || "")) return "URLs with credentials are not allowed.";
+  if (mode === "github" && !GH_RE.test(t)) return "Use the form https://github.com/<owner>/<repo> (public github.com repositories only).";
   return "";
 }
 
 function Overview({ run, runs, openRun, scan, go }) {
   const [repo, setRepo] = useState(() => storage.get("ghostlib.repo") || "");
+  const [mode, setMode] = useState(() => (isUrl(storage.get("ghostlib.repo") || "") ? "github" : "local"));
   const [fetchMeta, setFetchMeta] = useState(true);
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (!repo && runs[0]) setRepo(runs[0].repository); }, [runs, repo]);
@@ -81,12 +107,12 @@ function Overview({ run, runs, openRun, scan, go }) {
   const flagged = pkgs.filter((p) => p.assessment.score > 0).length;
   const tested = Object.values(run?.experiments || {}).filter((e) => e.state === "completed").length;
 
-  const hint = inputHint(repo);
+  const problem = inputProblem(mode, repo);
   const submit = async (e) => {
     e.preventDefault();
-    if (hint && hint.startsWith("Not supported")) return;
+    if (problem) return;
     setBusy(true); storage.set("ghostlib.repo", repo);
-    try { await scan(repo, fetchMeta); } finally { setBusy(false); }
+    try { await scan(repo, fetchMeta, mode); } finally { setBusy(false); }
   };
 
   return (
@@ -99,7 +125,7 @@ function Overview({ run, runs, openRun, scan, go }) {
         <h1 className="warp"><span>The</span><span>Ghost</span><span>Lib</span></h1>
         <Ghost className="hero-ghost" />
         <div className="hero-copy-r">
-          <p>Scan a Python project, map where each package lives, test a replacement in a sandbox, and keep the receipts.</p>
+          <p>Scan a Python project, map where each package lives, test a replacement on a disposable copy, and keep the receipts.</p>
           <button className="btn-bone" disabled={!run} onClick={() => go("Dependencies")}>Open findings</button>
         </div>
       </section>
@@ -107,14 +133,20 @@ function Overview({ run, runs, openRun, scan, go }) {
       <section className="panel scan">
         <h2>Summon a scan</h2>
         <form onSubmit={submit}>
-          <label className="field">Local repository path <span className="muted small">(or a public GitHub URL, which GhostLib clones for you)</span>
-            <input value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="D:\GitHub\LinkWatch   or   https://github.com/rishrek/LinkWatch" required />
+          <div className="modes" role="radiogroup" aria-label="Repository input type">
+            {Object.entries(MODES).map(([key, m]) => (
+              <button type="button" key={key} role="radio" aria-checked={mode === key} className={mode === key ? "mode on" : "mode"}
+                onClick={() => setMode(key)}>{m.label}</button>))}
+          </div>
+          <label className="field">{MODES[mode].label}
+            <input value={repo} onChange={(e) => setRepo(e.target.value)} placeholder={MODES[mode].placeholder} required aria-invalid={!!problem} />
           </label>
-          {hint && <p className="note">{hint}</p>}
+          <p className="muted small">{MODES[mode].help}</p>
+          {problem && <p className="note">{problem}</p>}
           <label className="check"><input type="checkbox" checked={fetchMeta} onChange={(e) => setFetchMeta(e.target.checked)} />
             Fetch PyPI metadata (network; cached 24 h)</label>
           <div className="actions">
-            <button className="btn-bone" disabled={busy}>{busy ? (isUrl(repo) ? "Cloning and scanning..." : "Scanning...") : "Run scan"}</button>
+            <button className="btn-bone" disabled={busy || !!problem}>{busy ? MODES[mode].busy : "Run scan"}</button>
           </div>
           <p className="muted small">The backend only reads this folder. It never runs repository code during a scan and never modifies it.</p>
         </form>
@@ -124,7 +156,7 @@ function Overview({ run, runs, openRun, scan, go }) {
           <div className="runlist">{runs.map((r) => (
             <button key={r.run_id} className={`row runrow ${run?.run_id === r.run_id ? "on" : ""}`} onClick={() => openRun(r.run_id)}>
               <code>{r.run_id}</code><span className="muted ellipsis">{r.repository}</span>
-              <span className="muted">{r.recommendations} AI · {r.experiments_completed} tested</span><span className="muted">{(r.commit || "").slice(0, 7)}</span>
+              <span className="muted">{r.recommendations} AI · {r.experiments_completed}/{r.at_risk} tested{r.input === "github" ? " · GitHub" : ""}</span><span className="muted">{(r.commit || "").slice(0, 7)}</span>
             </button>
           ))}</div>
         </>}
@@ -134,18 +166,23 @@ function Overview({ run, runs, openRun, scan, go }) {
         <section className="stats">
           <div><b>{pkgs.length}</b><span>dependencies scanned</span></div>
           <div><b>{flagged}</b><span>need review</span></div>
-          <div><b>{tested}</b><span>migrations tested</span></div>
+          <div><b>{tested}</b><span>migrations tested{run.run_status ? ` · run ${run.run_status.status.replace("_", " ")}` : ""}</span></div>
           <div><b>{na(run.project?.name)}</b><span>requires-python {na(run.python_requirement)} · {(run.git?.commit || "").slice(0, 7)}</span></div>
         </section>
+        {run.run_status && run.run_status.status !== "complete" && <p className="note">
+          This run is <b>{run.run_status.status.replace("_", " ")}</b>: {run.run_status.recommendations_ok} AI recommendations,
+          {" "}{run.run_status.experiments_completed}/{run.run_status.at_risk} at-risk packages tested
+          {run.run_status.untested_at_risk.length ? ` (not yet tested: ${run.run_status.untested_at_risk.join(", ")})` : ""}.
+          Untested packages have no verified results.</p>}
         <section className="panel">
           <h2>Haunted packages</h2>
           <p className="muted small">Ranked by a transparent rule score. Each point links to its evidence; it is not a probability.</p>
-          <div className="row head"><span>Package</span><span>Declared</span><span>Usages</span><span>Risk (rules) · learned priority</span></div>
+          <div className="row head"><span>Package</span><span>Declared</span><span>Usages · known vulns</span><span>Risk (rules) · learned priority</span></div>
           {pkgs.map((p) => (
             <button key={p.normalized_name} className="row" onClick={() => go("Dependencies", p.normalized_name)}>
               <code>{p.normalized_name}{p.groups.includes("dev") ? " (dev)" : ""}</code>
               <span className="muted">{[...new Set(p.declarations.map((d) => d.specifier || "any"))].join(" vs ")}</span>
-              <span className="muted">{p.locations.length} usages</span>
+              <span className="muted">{p.locations.length} usages{p.advisories?.status === "checked" && p.advisories.count ? ` · ${p.advisories.unique_issues} vuln` : ""}</span>
               <span><span className={`band band-${p.assessment.band}`}>{p.assessment.band} · {p.assessment.score}</span>
                 {p.learned && <span className="muted small" title={p.learned.priority.basis}> · {p.learned.priority.value}</span>}</span>
             </button>
@@ -215,6 +252,23 @@ function Learning() {
   );
 }
 
+function Advisories({ adv }) {
+  const a = adv || { status: "not_checked", reason: "This run predates advisory checks." };
+  return (
+    <>
+      <h3>Known vulnerabilities <Chip claim={a.status === "checked" ? "SOURCED" : "UNKNOWN"} /> <small className="muted">OSV.dev · not part of the risk score</small></h3>
+      {a.status !== "checked" ? <p className="empty">{a.reason}</p>
+        : a.count === 0 ? <p className="empty">No known advisories for version {a.version} (checked {(a.retrieved_at || "").slice(0, 10)}).</p>
+        : <>
+          <p>{a.unique_issues} unique issue{a.unique_issues === 1 ? "" : "s"} ({a.count} advisory IDs) affect the pinned version <code>{a.version}</code>.</p>
+          <ul>{a.vulnerabilities.map((v) => <li key={v.id}><a href={v.url} target="_blank" rel="noreferrer">{v.id}</a>
+            {v.aliases?.length ? <span className="muted"> ({v.aliases.join(", ")})</span> : null} — {v.summary || "no summary"}
+            {v.fixed_in?.length ? <span className="muted"> · fixed in {v.fixed_in.join(", ")}</span> : null}</li>)}</ul>
+        </>}
+    </>
+  );
+}
+
 /* ------------------------------------------------------------- Dependencies */
 
 function Dependencies({ run, selected, select }) {
@@ -257,6 +311,8 @@ function Dependencies({ run, selected, select }) {
           <dt>Source</dt><dd><a href={m.source} target="_blank" rel="noreferrer">{m.source}</a> <span className="muted">· {(m.retrieved_at || "").slice(0, 19)}</span></dd>
         </dl> : <p className="empty">{m.status}: {m.reason || "metadata not available"}</p>}
 
+        <Advisories adv={p.advisories} />
+
         <h3>Why it was flagged <span className={`band band-${p.assessment.band}`}>{p.assessment.band} · {p.assessment.score}</span></h3>
         {p.assessment.indicators.length === 0 && <p className="empty">No indicators fired.</p>}
         {p.assessment.indicators.map((r, i) => (
@@ -279,7 +335,7 @@ function Dependencies({ run, selected, select }) {
                 {u.is_test && <span className="state">test</span>}
                 {u.private_api.length > 0 && <span className="state state-warn">private API: {u.private_api.join(", ")}</span>}
                 <span className="muted small">{u.symbols_used.join(", ")}</span>
-                <a href={vscode(`${run.repository}/${u.file}`, u.line)}>Open in VS Code</a>
+                <OpenInVSCode runId={run.run_id} file={u.file} line={u.line} />
               </div>
               <pre>{s ? s.lines.map((l) => <span key={l.n} className={l.n === u.line ? "hl" : ""}>{String(l.n).padStart(4)}  {l.text}{"\n"}</span>) : u.statement}</pre>
             </div>
@@ -453,9 +509,11 @@ function Migration({ run, health, selected, select, refresh, go, setWarn }) {
       {/* Step 4 — adopt */}
       {live?.state === "completed" && <section className="stepbox active">
         <h3>4. Adopt it (your decision, in your editor)</h3>
+        {p.advisories?.status === "checked" && p.advisories.count > 0 && <p>Security side effect <Chip claim="SOURCED" />: the current pin has {p.advisories.unique_issues} known
+          issue(s) on OSV.dev; see the Capsule for which ones this candidate's version is past the fix for.</p>}
         <p>GhostLib never changes your repository. If you are happy with the result, apply the patch yourself:</p>
         <div className="actions">
-          <a className="btn-bone" href={vscode(live.diff_file, 1)}>Open patch in VS Code</a>
+          <OpenInVSCode runId={run.run_id} file={live.diff_file} line={1} scope="run" label="Open patch in VS Code" big />
           <button className="btn-line" onClick={() => go("Verification", name)}>See full test comparison</button>
         </div>
         <pre>{`cd "${run.repository}"\ngit apply "${live.diff_file}"`}</pre>
@@ -472,6 +530,7 @@ function GemmaProof({ r }) {
   return (
     <details className="more"><summary>Proof this came from Gemma 4</summary>
       <dl className="kv">
+        <dt>Call ID</dt><dd><code>{na(r.call_id)}</code></dd>
         <dt>Model requested</dt><dd><code>{r.model}</code> via {r.inference_method}</dd>
         <dt>Model that answered</dt><dd><code>{na(r.model_version)}</code> <span className="muted small">(the API's own <code>modelVersion</code> field)</span></dd>
         <dt>Requested at</dt><dd>{(r.requested_at || "").slice(0, 19)} · {na(r.latency_seconds)} s</dd>
@@ -606,13 +665,13 @@ function Capsule({ run, capsule, regenerate }) {
         <button className="btn-line" disabled={busy} onClick={redo}>{busy ? "Regenerating..." : "Regenerate"}</button>
       </div>
       <h3>Gemma 4 calls in this run <Chip claim="AI-RECOMMENDED" /></h3>
-      <p className="muted small">Each row is a real API request. "Model that answered" is the <code>modelVersion</code> field returned by Google's API.</p>
+      <p className="muted small">Source: {capsule.ai.call_log_source}. Each row is a real API request. "Model that answered" is the <code>modelVersion</code> field returned by Google's API.</p>
       <div className="actions"><button className="btn-line" onClick={() => api.aiStatus().then(setLive).catch((e) => setLive({ status: "AI_ERROR", reason: e.message }))}>Check model live now</button>
         {live && <span><State value={live.status} /> <code>{na(live.model_resource)}</code> {live.display_name || ""} {live.version ? `v${live.version}` : ""} {live.reason || ""}</span>}</div>
       {(capsule.ai.calls || []).length ? <table className="cmp">
-        <thead><tr><th>When</th><th>Purpose</th><th>Package</th><th>Model that answered</th><th>Tokens in/out</th><th>Status</th></tr></thead>
-        <tbody>{capsule.ai.calls.map((c, i) => <tr key={i}><td>{(c.requested_at || "").slice(11, 19)}</td><td>{c.purpose}</td><td><code>{c.package}</code></td>
-          <td><code>{na(c.model_version_returned)}</code></td><td>{na(c.prompt_tokens)} / {na(c.output_tokens)}</td><td><State value={c.status} /></td></tr>)}</tbody>
+        <thead><tr><th>When</th><th>Call ID</th><th>Purpose</th><th>Package</th><th>Model that answered</th><th>Tokens in/out</th><th>Status</th></tr></thead>
+        <tbody>{capsule.ai.calls.map((c, i) => <tr key={i}><td>{(c.requested_at || "").slice(11, 19)}</td><td><code>{(c.call_id || "—").slice(0, 8)}</code></td><td>{c.purpose}</td><td><code>{c.package}</code></td>
+          <td><code>{na(c.model_version_returned)}</code></td><td>{na(c.prompt_tokens)} / {na(c.output_tokens)}</td><td><State value={c.status} /> {c.error ? <span className="muted small">{c.error.slice(0, 80)}</span> : null}</td></tr>)}</tbody>
       </table> : <p className="empty">No Gemma calls were made in this run.</p>}
       <h3>Evidence legend</h3>
       {Object.entries(capsule.evidence_legend).map(([k, v]) => <div className="ev" key={k}><p>{v}</p><Chip claim={k} /></div>)}
@@ -668,10 +727,10 @@ export default function App() {
     }).catch(() => {});
   }, [openRun]);
 
-  const scan = async (repository, fetchMeta) => {
+  const scan = async (repository, fetchMeta, mode) => {
     setWarn(null);
     try {
-      const created = await api.createRun(repository, fetchMeta);
+      const created = await api.createRun(repository, fetchMeta, mode);
       setRuns(await api.listRuns());
       await openRun(created.run_id);
     } catch (e) { setWarn(e.message); }

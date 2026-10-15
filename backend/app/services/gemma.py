@@ -11,6 +11,7 @@ import hashlib
 import json
 import re
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Literal
 from urllib.error import HTTPError, URLError
@@ -185,7 +186,7 @@ def recommend_migration(evidence: dict, *, retries: int = 2) -> dict:
 def _generate(prompt: str, schema: type[BaseModel], key: str, *, retries: int = 2, max_tokens: int = 8192) -> dict:
     """Call Gemma in JSON mode. The output budget must cover Gemma 4's thinking tokens as well as
     the answer (observed: ~1.7k thought tokens for a recommendation), hence the large limits."""
-    base = {"evidence_type": "AI-RECOMMENDED", **model_info(),
+    base = {"evidence_type": "AI-RECOMMENDED", **model_info(), "call_id": uuid.uuid4().hex[:16],
             "requested_at": datetime.now(timezone.utc).isoformat()}
     if not config.GEMINI_API_KEY:
         return {**base, "status": "AI_UNAVAILABLE",
