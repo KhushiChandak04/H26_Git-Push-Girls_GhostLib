@@ -343,8 +343,12 @@ def propose(run_id: str, package: str, candidate: str | None = None, kind: str |
     ai = (rec or {}).get("recommendation") if (rec or {}).get("status") == "ok" else None
 
     if candidate is None and ai:
-        candidate = ai["recommended"]
-        kind = next((c["kind"] for c in ai["candidates"] if c["package"] == candidate), kind)
+        rec_name = ai["recommended"]
+        # The model sometimes names the action ("remove") instead of a package; match on either.
+        chosen = (next((c for c in ai["candidates"] if c["package"] == rec_name), None)
+                  or next((c for c in ai["candidates"] if c["kind"] == rec_name), None)
+                  or ai["candidates"][0])
+        candidate, kind = chosen["package"], chosen["kind"]
     if candidate is None:
         candidate, kind = package, "upgrade"  # deterministic default: latest release of the same package
     kind = kind or ("upgrade" if candidate == package else "pypi")
@@ -367,7 +371,10 @@ def propose(run_id: str, package: str, candidate: str | None = None, kind: str |
     code_proposal = {"status": "not_requested"}
     if kind != "upgrade" or use_ai_code_changes:
         source_files = (pkg.get("usage") or {}).get("source_files", [])
-        if kind in ("pypi", "stdlib") or (kind == "upgrade" and use_ai_code_changes and ai):
+        if not source_files:
+            code_proposal = {"status": "not_needed",
+                             "reason": f"No source file imports {package}; only manifests change."}
+        elif kind in ("pypi", "stdlib") or (kind == "upgrade" and use_ai_code_changes and ai):
             code_proposal = gemma.propose_code_changes(
                 package=package, candidate=candidate, kind=kind,
                 files={f: (repo / f).read_text(encoding="utf-8", errors="replace") for f in source_files},
