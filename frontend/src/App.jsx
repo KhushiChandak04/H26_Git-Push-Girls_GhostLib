@@ -1,11 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import sample from "./sample-capsule.json";
-import Overview from "./pages/Overview.jsx";
-import DependencyExplorer from "./pages/DependencyExplorer.jsx";
-import MigrationWorkbench from "./pages/MigrationWorkbench.jsx";
-import VerificationCenter from "./pages/VerificationCenter.jsx";
-import ExitCapsule from "./pages/ExitCapsule.jsx";
-import { api } from "./services/api.js";
 
 const API = import.meta.env.VITE_API_URL;
 const na = (v) => (v === undefined || v === null || v === "" ? "Not available" : v);
@@ -262,47 +256,51 @@ function Capsule({ data, setState }) {
 }
 
 export default function App() {
-  const [active, setActive] = useState("Overview");
-  const [run, setRun] = useState(null);
-  const [selected, setSelected] = useState(null);
-  const [health, setHealth] = useState(null);
-  const [healthError, setHealthError] = useState("");
-
-  useEffect(() => {
-    api.health().then(setHealth).catch(e => setHealthError(e.message));
-  }, []);
-
-  const loadRun = useCallback(async (id) => {
-    const data = await api.getRun(id);
-    setRun(data);
-    return data;
-  }, []);
-
-  const refresh = useCallback(() => run ? loadRun(run.run_id) : Promise.resolve(null), [run, loadRun]);
-
-  const go = (page, pkg) => { if (pkg) setSelected(pkg); setActive(page); };
-  const Page = pages[active];
-  const ai = health?.ai;
-
-  return <div className="shell">
-    <aside className="sidebar">
-      <div className="brand"><span className="brand-mark">G</span><div><strong>GhostLib</strong><small>DEPENDENCY RESILIENCE</small></div></div>
-      <div className="nav-label">WORKSPACE</div>
-      {Object.keys(pages).map((name, i) => <button key={name} className={active === name ? "nav-item active" : "nav-item"}
-        disabled={i > 0 && !run} title={i > 0 && !run ? "Run or open a scan first" : ""}
-        onClick={() => setActive(name)}><span className="nav-num">0{i + 1}</span>{name}</button>)}
-      <div className="sidebar-bottom">
-        {healthError ? <><span className="status-dot bad" /> Backend offline</> : <><span className="status-dot" /> Backend connected</>}
-        <small>{ai ? `Gemma: ${ai.model} · ${ai.configured ? "key configured" : "no API key"}` : "…"}</small>
-      </div>
-    </aside>
-    <main className="main">
-      <header className="topbar">
-        <div><span className="eyebrow">GHOSTLIB / {run ? run.project?.name?.toUpperCase() || "RUN" : "NO RUN"}</span><h1>{active}</h1></div>
-        {run && <span className="pill" title={run.repository}>RUN {run.run_id} · {(run.git?.commit || "").slice(0, 7)}</span>}
+  const [{ data, origin, warn, loading }, setState] = useCapsule();
+  const [tab, setTab] = useState("Overview");
+  const [idx, setIdx] = useState(0);
+  const go = (nextTab, nextIndex) => {
+    setTab(nextTab);
+    if (nextIndex !== undefined) setIdx(nextIndex);
+  };
+  const act = (kind, dependency, candidate) => {
+    if (!API) return alert("Connect the backend (VITE_API_URL) to run this action.");
+    fetch(`${API}/api/migration/${kind}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dependency: dependencyName(dependency), candidate })
+    })
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error(response.status))))
+      .then(() => fetch(`${API}/api/capsule/latest`))
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error(response.status))))
+      .then((nextData) => setState({ data: nextData, origin: "api", warn: null, loading: false }))
+      .catch((error) => setState((state) => ({ ...state, warn: `Action failed: ${error.message}` })));
+  };
+  return (
+    <>
+      <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
+        <filter id="melt">
+          <feTurbulence type="fractalNoise" baseFrequency="0.010 0.018" numOctaves="2" seed="7" result="n" />
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="34" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
+      <header className="nav">
+        <strong className="mark">GhostLib</strong>
+        <nav>{TABS.map((name) => <button key={name} className={name === tab ? "on" : ""} onClick={() => go(name)}>{name}</button>)}</nav>
+        <span className="muted">{origin === "sample" ? "sample data" : origin === "file" ? "loaded file" : "live"}</span>
       </header>
-      {healthError && <div className="alert">{healthError} Start it with <code>uvicorn app.main:app --app-dir backend</code>.</div>}
-      <Page run={run} loadRun={loadRun} refresh={refresh} selected={selected} setSelected={setSelected} go={go} health={health} />
-    </main>
-  </div>;
+      {warn && <div className="banner warn">{warn}</div>}
+      <main>
+        {loading ? <p className="empty">Summoning the capsule...</p> : (
+          <>
+            {tab === "Overview" && <Overview data={data} go={go} />}
+            {tab === "Dependencies" && <Dependencies data={data} idx={idx} setIdx={setIdx} />}
+            {tab === "Migration" && <Migration data={data} idx={idx} setIdx={setIdx} act={act} />}
+            {tab === "Verification" && <Verification data={data} idx={idx} />}
+            {tab === "Capsule" && <Capsule data={data} setState={setState} />}
+          </>
+        )}
+      </main>
+    </>
+  );
 }
