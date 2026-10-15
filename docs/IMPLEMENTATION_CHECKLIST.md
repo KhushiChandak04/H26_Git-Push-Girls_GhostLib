@@ -7,26 +7,26 @@
 
 Last reviewed: 2026-10-15.
 
-## 0. Current baseline status
+## 0. Current status (updated 2026-10-15)
 
-- [x] Repository scaffold and module layout created.
-- [x] FastAPI app, basic routes and CLI entry point wired.
-- [x] Deterministic manifest scan for `requirements*.txt` and common `pyproject.toml` dependency sections.
-- [x] Best-effort Python AST import mapping with a small alias map.
-- [x] Evidence fields include manifest path, declaration and manifest SHA-256.
-- [x] Explainable indicators with no invented numeric risk score.
-- [x] Capsule generation to JSON and Markdown.
-- [x] Optional PyPI JSON metadata provider, disabled by default and opt-in via CLI/API.
-- [x] Disposable-copy workspace creation; no commands or installs executed.
-- [x] Migration-plan schema validation only; no migration execution.
-- [x] Basic baseline/candidate result-summary comparison helper.
-- [x] Initial React/Vite UI pages and scan/capsule API helper.
-- [x] Initial pytest tests authored.
-- [ ] Test suite has not been run in the user's environment; run locally and fix any failures.
-- [ ] Gemma 4 integration not configured.
-- [ ] No real replacement recommendation or migration has been performed.
-- [ ] No baseline/candidate tests have been executed by GhostLib.
-- [ ] Frontend workflow is incomplete beyond the overview scan.
+Verified end to end on LinkWatch `f52f393`; see README "Example" and `docs/DEMO_SCRIPT.md`. The detailed sections
+below are the original starter checklist and are partly outdated.
+
+- [x] Recursive manifest scan, AST usage map (file/line/statement/symbols), private-API use, undeclared imports,
+      declaration conflicts, transitive test relations.
+- [x] PyPI metadata (latest + pinned version) with 24 h cache, source URL and retrieval time.
+- [x] Transparent rule-based risk score; every indicator has an evidence type and its evidence.
+- [x] Gemma 4 adapter (AI Studio REST, strict Pydantic schema, AI_UNAVAILABLE / AI_ERROR / AI_INVALID_OUTPUT);
+      mocked tests pass. **Live call not yet verified: it needs a GEMINI_API_KEY.**
+- [x] Deterministic validation of AI candidates (PyPI existence, declared Python support, stdlib presence).
+- [x] Experiments: propose → diff → explicit approval → disposable copy + uv venv → baseline vs candidate pytest
+      → per-test comparison → original-repo unchanged check. Verified on Python 3.12.14 and 3.13.7.
+- [x] Capsule JSON + Markdown per run with evidence labels, gaps, concerns, reproduction and rollback.
+- [x] CLI (`ghostlib scan|recommend|experiment|capsule|runs|ai-check`) and REST API.
+- [x] React dashboard wired to the API (5 pages); production build passes.
+- [x] GhostLib's own tests: 18 passing on Python 3.12.14 and 3.13.7.
+- [ ] Live Gemma 4 recommendation and AI code-change experiment (e.g. toml → tomllib): pending an API key.
+- [ ] Confirm the organizer's fork/submission naming requirements.
 
 ## 1. Product definition and architecture
 
