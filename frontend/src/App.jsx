@@ -125,7 +125,7 @@ function Overview({ run, runs, openRun, scan, go }) {
         <h1 className="warp"><span>The</span><span>Ghost</span><span>Lib</span></h1>
         <Ghost className="hero-ghost" />
         <div className="hero-copy-r">
-          <p>Scan a Python project, map where each package lives, test a replacement on a disposable copy, and keep the receipts.</p>
+          <p>Scan a Python project, map dependencies and usages, and keep the evidence in one place.</p>
           <button className="btn-bone" disabled={!run} onClick={() => go("Dependencies")}>Open findings</button>
         </div>
       </section>
@@ -490,8 +490,8 @@ function Migration({ run, health, selected, select, refresh, go, setWarn }) {
       {/* Step 3 — test */}
       {live && <section className={`stepbox ${step === 2 || step === 1 ? "active" : ""}`}>
         <h3>3. Test it on a copy</h3>
-        <p>GhostLib copies your project to a temporary folder, installs the <em>current</em> dependencies in one copy and the <em>new</em> ones in another,
-          and runs your test suite in both. Your real project is never touched.</p>
+        <p>Verification compares the baseline and candidate suites in an OS/container sandbox. GhostLib will not execute
+          repository code on the host; if a supported sandbox is unavailable, the run is marked as not run.</p>
         {live.state === "proposed" && <>
           <label className="check"><input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} />
             I have read the change above. Run the tests.</label>
@@ -504,6 +504,7 @@ function Migration({ run, health, selected, select, refresh, go, setWarn }) {
         </>}
         {live.state === "running" && <p className="note">Running tests on both copies... this takes about a minute.</p>}
         {live.state === "failed" && <p className="note">The test run itself failed: {live.error}</p>}
+        {live.state === "blocked" && <p className="note">{live.error || "Tests were not run because no supported sandbox is configured."}</p>}
         {live.state === "completed" && <p><Verdict c={live.comparison} /></p>}
       </section>}
 
@@ -811,7 +812,7 @@ export default function App() {
           <button key={name} className={name === tab ? "on" : ""} disabled={i > 0 && !run}
             title={i > 0 && !run ? "Run or open a scan first" : ""} onClick={() => go(name)}>{name}</button>
         ))}</nav>
-        <span className="muted">{status}{health?.ai ? ` · Gemma ${health.ai.configured ? "ready" : "not configured"}` : ""}</span>
+        <span className="muted">{status}{health?.ai ? ` · Gemma ${health.ai.configured ? "key set" : "not configured"}` : ""}</span>
       </header>
       {warn && <div className="banner warn">{warn} <button className="link" onClick={() => setWarn(null)}>dismiss</button></div>}
       <main>

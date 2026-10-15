@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.services import gemma
+from app.services.security import redact_data
 
 CAPSULE_SCHEMA = "1.0"
 TOOL_VERSION = "ghostlib 0.2.0"
@@ -396,8 +397,9 @@ def write_capsule(capsule: dict, output_dir: Path | str) -> list[str]:
     out = Path(output_dir).expanduser().resolve()
     out.mkdir(parents=True, exist_ok=True)
     json_path, md_path = out / "capsule.json", out / "capsule.md"
-    json_path.write_text(json.dumps(capsule, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
-    md_path.write_text(capsule_markdown(capsule), encoding="utf-8")
+    safe_capsule = redact_data(capsule)
+    json_path.write_text(json.dumps(safe_capsule, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+    md_path.write_text(capsule_markdown(safe_capsule), encoding="utf-8")
     return [str(json_path), str(md_path)]
 
 

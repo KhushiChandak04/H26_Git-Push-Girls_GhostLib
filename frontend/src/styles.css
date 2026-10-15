@@ -96,6 +96,7 @@ dt{color:var(--mute)}dd{margin:0}
 .kv{grid-template-columns:140px 1fr;margin-bottom:1.5rem}
 
 @media (max-width:900px){.hero{height:420px}.hero-copy-l,.hero-copy-r,.burst,.hero-ghost{display:none}.split,.runs,.stats{grid-template-columns:1fr}.nav,main{padding-left:1rem;padding-right:1rem}.hero{margin:-1.5rem -1rem 1.5rem}.banner{padding-left:1rem;padding-right:1rem}}
+@media (max-width:1050px){.nav{flex-wrap:nowrap;gap:1rem}.nav nav{order:0;flex:1 1 auto;justify-content:flex-end;gap:.8rem;flex-wrap:nowrap}.nav>.muted{display:none}}
 @media (prefers-reduced-motion:reduce){.burst,.hero-ghost{animation:none}}
 
 /* ---- live-data additions (same palette) ---- */
@@ -141,7 +142,7 @@ a.btn-bone{color:var(--plum)}a.btn-line{color:var(--bone)}
 .runs>*,.split>*,.cands>*,.detail{min-width:0}
 .run,.ev,.usage-h,.detail p,.detail li,.kv dd{overflow-wrap:anywhere}
 .usage-h{flex-wrap:wrap}
-@media (max-width:600px){.nav{gap:.6rem 1rem}.nav nav{justify-content:flex-start;gap:.9rem}h2{font-size:1.6rem}.panel .row{grid-template-columns:1fr 1fr}.stats b{font-size:1.9rem}}
+@media (max-width:600px){.nav{gap:.6rem 1rem;flex-wrap:wrap}.nav nav{order:1;flex:1 0 100%;flex-wrap:wrap;justify-content:flex-start;gap:.9rem}h2{font-size:1.6rem}.panel .row{grid-template-columns:1fr 1fr}.stats b{font-size:1.9rem}}
 
 /* ---- uniform evidence chips (overrides earlier chip styles) ---- */
 .chips{display:inline-flex;gap:.35rem;vertical-align:middle;flex-wrap:wrap}

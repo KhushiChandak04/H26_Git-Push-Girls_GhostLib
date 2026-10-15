@@ -20,7 +20,7 @@ import sys
 from app.services import agent, analysis, experiment, gemma, memory
 from app.services.capsule import generate_for_run
 
-COMMANDS = {"advisories", "scan", "recommend", "experiment", "capsule", "runs", "ai-check", "auto", "learn", "ui"}
+COMMANDS = {"advisories", "pipeline", "scan", "recommend", "experiment", "capsule", "runs", "ai-check", "auto", "learn", "ui"}
 
 
 def _print(data) -> None:
@@ -65,6 +65,35 @@ def cmd_scan(args) -> int:
         _print(analysis.recommend_all(rid, min_score=args.min_score))
     files = generate_for_run(rid)["files"]
     print("Capsule:", *files, sep="\n  ")
+    return 0
+
+
+def cmd_pipeline(args) -> int:
+    """Run scan, recommendations, reviewable migration proposals, and capsule generation."""
+    from app.services.repo_input import resolve
+    target = resolve(args.repository)
+    if target["source"] == "github":
+        print(f"Cloned {target['input']} -> {target['path']} ({target.get('clone')})")
+    run = analysis.create_run(target["path"], fetch_metadata=not args.no_metadata)
+    analysis.set_input_info(run["run_id"], target)
+    run_id = run["run_id"]
+    print(f"Run {run_id}: {len(run['manifests'])} manifests, {len(run['packages'])} packages, "
+          f"{run['source_files_scanned']} Python files scanned")
+    statuses = analysis.recommend_all(run_id, min_score=args.min_score)
+    proposals = {}
+    for package, status in statuses.items():
+        if status not in ("ok", "AI_UNAVAILABLE", "AI_ERROR", "AI_INVALID_OUTPUT"):
+            continue
+        try:
+            result = experiment.propose(run_id, package)
+            proposals[package] = {"state": result["state"], "candidate": result["candidate"],
+                                  "kind": result["kind"], "changed_files": result["changed_files"]}
+        except (ValueError, KeyError, FileNotFoundError) as exc:
+            proposals[package] = {"state": "not_prepared", "error": str(exc)}
+    capsule = generate_for_run(run_id)
+    _print({"run_id": run_id, "recommendations": statuses,
+            "migration_proposals": proposals, "capsule": capsule["files"]})
+    print("Repository tests were not executed and the original repository was not modified.")
     return 0
 
 
@@ -151,7 +180,8 @@ def cmd_experiment(args) -> int:
     print(f"Approved. Running baseline and candidate tests on Python {args.python}...")
     record = experiment.approve_and_run(args.run_id, args.package, approved_by="cli user", python=args.python)
     if record["state"] != "completed":
-        print("Experiment failed:", record.get("error"))
+        label = "Experiment not run:" if record["state"] == "blocked" else "Experiment failed:"
+        print(label, record.get("error"))
         return 1
     for side in ("baseline_run", "candidate_run"):
         r = record[side]
@@ -186,9 +216,15 @@ def cmd_learn(args) -> int:
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] not in COMMANDS and not argv[0].startswith("-"):
-        argv = ["scan", *argv]
+        argv = ["pipeline", *argv]
     parser = argparse.ArgumentParser(prog="ghostlib", description="Evidence-first dependency resilience.")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    p = sub.add_parser("pipeline", help="Scan, recommend migrations, prepare patches, and write a capsule")
+    p.add_argument("repository", help="Local folder or public GitHub URL")
+    p.add_argument("--no-metadata", action="store_true", help="Skip PyPI and OSV requests")
+    p.add_argument("--min-score", type=int, default=1)
+    p.set_defaults(func=cmd_pipeline)
 
     p = sub.add_parser("scan", help="Scan a repository, fetch PyPI metadata, assess risk, write a capsule")
     p.add_argument("repository", nargs="?", default=".", help="Local folder (default: current folder) or GitHub URL")

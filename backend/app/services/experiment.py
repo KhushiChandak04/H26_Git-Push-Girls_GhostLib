@@ -1,31 +1,16 @@
 """Migration Flight Simulator: baseline vs candidate test execution in disposable workspaces.
 
 Workflow (state in ``experiments/<package>/experiment.json``):
-  propose  -> builds a candidate diff (manifest edits + optional Gemma code edits); nothing executed
-  approve  -> human approval; applies the diff to a fresh copy and runs candidate tests
-  reject   -> deletes the candidate workspace; the original repository was never touched
-
-Isolation actually provided (documented in every record):
-  * the original repository is copied (without .git); it is never written to — verified by
-    comparing ``git status --porcelain`` and manifest hashes before/after;
-  * baseline and candidate each get their own virtual environment (uv);
-  * commands are fixed argument lists (no shell), run with timeouts and an allow-listed
-    environment (API keys and git credentials are not passed through).
-  It is NOT a security sandbox: test code runs as the current user on this machine.
+  propose -> builds a reviewable candidate diff; nothing is executed
+  approve -> blocked until a supported OS/container sandbox runner is configured
+  reject  -> removes the candidate proposal workspace
 """
 from __future__ import annotations
 
 import difflib
-import hashlib
 import json
-import os
-import platform
 import re
 import shutil
-import subprocess
-import sys
-import threading
-import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
@@ -35,19 +20,11 @@ from packaging.utils import canonicalize_name
 from app.services import analysis, gemma
 from app.services.metadata import get_package_metadata
 
-COPY_IGNORE = shutil.ignore_patterns(".git", ".venv", "venv", "env", "node_modules", "__pycache__", "dist",
-                                     "build", ".pytest_cache", ".mypy_cache", ".ruff_cache", "*.egg-info")
-ENV_ALLOW = {"PATH", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "TEMP", "TMP", "COMSPEC", "PATHEXT", "LOCALAPPDATA",
-             "APPDATA", "USERPROFILE", "HOME", "HOMEDRIVE", "HOMEPATH", "NUMBER_OF_PROCESSORS",
-             "PROCESSOR_ARCHITECTURE", "UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR", "LANG", "LC_ALL", "TZ"}
-INSTALL_TIMEOUT = 600
-TEST_TIMEOUT = 600
 DEFAULT_PYTHON = "3.12"
 ALLOWED_PYTHONS = {"3.12", "3.13"}
-ISOLATION_NOTE = ("Disposable copy + separate uv virtualenv; fixed argv commands (no shell) with timeouts and an "
-                  "allow-listed environment. Not a security sandbox: tests execute as the current OS user with "
-                  "network access.")
-_LOCKS: dict[str, threading.Lock] = {}
+SANDBOX_BLOCKER = ("Execution blocked: no supported OS/container sandbox runner is configured. A disposable copy "
+                   "and virtualenv do not safely contain untrusted repository code.")
+ISOLATION_NOTE = SANDBOX_BLOCKER
 
 
 # --------------------------------------------------------------------------- helpers
@@ -56,68 +33,19 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _sha(path: Path) -> str | None:
-    return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
-
-
-def _safe_env(extra: dict | None = None) -> dict:
-    env = {k: v for k, v in os.environ.items() if k.upper() in ENV_ALLOW}
-    env.update({"PYTHONDONTWRITEBYTECODE": "1", "PYTHONNOUSERSITE": "1", "GIT_TERMINAL_PROMPT": "0",
-                "PIP_DISABLE_PIP_VERSION_CHECK": "1", "PYTHONIOENCODING": "utf-8"})
-    env.update(extra or {})
-    return env
-
-
 def _inside(base: Path, target: Path) -> bool:
     base, target = base.resolve(), target.resolve()
     return target == base or base in target.parents
 
 
 def run_command(argv: list[str], cwd: Path, log_dir: Path, label: str, timeout: int, boundary: Path) -> dict:
-    """Run a fixed argv (no shell) inside ``boundary``; persist full output to a log file."""
+    """Refuse host-side execution; a copied project is not an execution sandbox."""
     if not _inside(boundary, cwd):
         raise ValueError(f"Refusing to run outside the experiment boundary: {cwd}")
-    log_dir.mkdir(parents=True, exist_ok=True)
-    started, t0 = _now(), time.monotonic()
-    timed_out = False
-    try:
-        proc = subprocess.run(argv, cwd=str(cwd), env=_safe_env(), capture_output=True, text=True,
-                              encoding="utf-8", errors="replace", timeout=timeout, shell=False)
-        code, out, err = proc.returncode, proc.stdout, proc.stderr
-    except subprocess.TimeoutExpired as exc:
-        timed_out, code = True, None
-        out = exc.stdout if isinstance(exc.stdout, str) else (exc.stdout or b"").decode("utf-8", "replace")
-        err = exc.stderr if isinstance(exc.stderr, str) else (exc.stderr or b"").decode("utf-8", "replace")
-    except OSError as exc:
-        code, out, err = None, "", f"Could not start command: {exc}"
-    log_path = log_dir / f"{label}.log"
-    log_path.write_text(f"$ {' '.join(argv)}\n# cwd: {cwd}\n# exit: {code} timed_out: {timed_out}\n\n"
-                        f"--- stdout ---\n{out}\n--- stderr ---\n{err}\n", encoding="utf-8")
-    return {"label": label, "argv": argv, "cwd": str(cwd), "exit_code": code, "timed_out": timed_out,
-            "started_at": started, "duration_seconds": round(time.monotonic() - t0, 2),
-            "log": str(log_path), "stdout_tail": out[-4000:], "stderr_tail": err[-2000:]}
-
-
-def _venv_python(venv: Path) -> Path:
-    return venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-
-
-def _original_state(repo: Path, manifests: list[dict]) -> dict:
-    status = None
-    try:
-        proc = subprocess.run(["git", "-C", str(repo), "status", "--porcelain"], capture_output=True, text=True, timeout=20)
-        status = proc.stdout if proc.returncode == 0 else None
-    except (OSError, subprocess.TimeoutExpired):
-        pass
-    return {"git_status_porcelain": status,
-            "manifest_sha256": {m["path"]: _sha(repo / m["path"]) for m in manifests if m.get("sha256")}}
+    raise RuntimeError(SANDBOX_BLOCKER)
 
 
 # --------------------------------------------------------------------------- test environment
-
-def _requirement_files(workspace: Path) -> list[str]:
-    return sorted(p.name for p in workspace.glob("requirements*.txt"))
-
 
 def prepare_and_test(workspace: Path, venv: Path, log_dir: Path, boundary: Path, python: str,
                      extra_test_files: list[str] | None = None) -> dict:
@@ -310,25 +238,9 @@ def compare(baseline: dict, candidate: dict) -> dict:
 def ensure_baseline(run_id: str, python: str = DEFAULT_PYTHON) -> dict:
     if python not in ALLOWED_PYTHONS:
         raise ValueError(f"Python {python} is not a supported target ({sorted(ALLOWED_PYTHONS)}).")
-    rdir = analysis.run_dir(run_id)
-    bdir = rdir / f"baseline-py{python}"
-    record_file = bdir / "baseline.json"
-    lock = _LOCKS.setdefault(str(bdir), threading.Lock())
-    with lock:
-        if record_file.is_file():
-            return json.loads(record_file.read_text(encoding="utf-8"))
-        scan = json.loads((rdir / "scan.json").read_text(encoding="utf-8"))
-        repo = Path(scan["repository"])
-        workspace = bdir / "workspace"
-        if workspace.exists():
-            shutil.rmtree(workspace, ignore_errors=True)
-        shutil.copytree(repo, workspace, ignore=COPY_IGNORE)
-        record = prepare_and_test(workspace, bdir / "venv", bdir / "logs", rdir, python)
-        record.update({"kind": "baseline", "evidence_type": "EXECUTION-VERIFIED", "commit": (scan.get("git") or {}).get("commit"),
-                       "host": {"platform": platform.platform(), "runner": "uv" if shutil.which("uv") else "venv+pip"},
-                       "completed_at": _now(), "isolation": ISOLATION_NOTE})
-        record_file.write_text(json.dumps(record, indent=2), encoding="utf-8")
-        return record
+    return {"kind": "baseline", "python_requested": python, "status": "blocked",
+            "evidence_type": "UNKNOWN", "blocker": SANDBOX_BLOCKER,
+            "commands": [], "tests": {"available": False, "cases": {}}, "isolation": ISOLATION_NOTE}
 
 
 # --------------------------------------------------------------------------- proposals
@@ -490,6 +402,8 @@ def _save(edir: Path, record: dict) -> None:
 
 
 def get_experiment(run_id: str, package: str) -> dict:
+    if not analysis.PKG_RE.fullmatch(package or ""):
+        raise ValueError("Invalid package name.")
     edir = analysis.run_dir(run_id) / "experiments" / package
     if not (edir / "experiment.json").is_file():
         raise FileNotFoundError("No experiment for this package.")
@@ -497,6 +411,8 @@ def get_experiment(run_id: str, package: str) -> dict:
 
 
 def reject(run_id: str, package: str, reason: str = "") -> dict:
+    if not analysis.PKG_RE.fullmatch(package or ""):
+        raise ValueError("Invalid package name.")
     edir = analysis.run_dir(run_id) / "experiments" / package
     record = get_experiment(run_id, package)
     if record["state"] == "running":
@@ -510,7 +426,7 @@ def reject(run_id: str, package: str, reason: str = "") -> dict:
 
 
 def approve_and_run(run_id: str, package: str, approved_by: str = "local user", python: str = DEFAULT_PYTHON) -> dict:
-    """Human approval gate, then apply the reviewed diff to a fresh copy and run baseline + candidate."""
+    """Keep approval auditable while refusing to execute outside a security sandbox."""
     if python not in ALLOWED_PYTHONS:
         raise ValueError("Unsupported Python version.")
     rdir = analysis.run_dir(run_id)
@@ -561,10 +477,4 @@ def approve_and_run(run_id: str, package: str, approved_by: str = "local user", 
 
 
 def approve_in_background(run_id: str, package: str, approved_by: str, python: str) -> dict:
-    record = get_experiment(run_id, package)
-    if record["state"] == "running":
-        return record
-    thread = threading.Thread(target=approve_and_run, args=(run_id, package, approved_by, python), daemon=True)
-    thread.start()
-    time.sleep(0.3)
-    return get_experiment(run_id, package)
+    return approve_and_run(run_id, package, approved_by, python)

@@ -1,8 +1,9 @@
 # GhostLib
 
-**Evidence-first dependency resilience.** GhostLib scans a real Python repository, shows the evidence behind every
-dependency risk, asks **Gemma 4** for a migration plan, runs **baseline-versus-candidate tests in a disposable
-workspace**, and writes a reusable **Dependency Exit Capsule** that says exactly what was proven and what was not.
+**Evidence-first dependency resilience.** GhostLib scans a local Python repository or a public GitHub URL, shows the
+evidence behind dependency risk, asks **Gemma 4** for migration plans, prepares reviewable patches, and writes a
+reusable **Dependency Exit Capsule**. Repository tests are fail-closed until a supported OS/container sandbox is
+available; GhostLib will not execute untrusted project code as the current user.
 
 > Most tools tell you a library is risky. GhostLib shows you the evidence, experiments with a replacement, and tells
 > you exactly what was proven and what remains uncertain.
@@ -22,11 +23,10 @@ GhostLib is **one Python engine with two front doors**. Both produce identical r
 |---|---|---|
 | Start | `pip install -e .` then `ghostlib scan targets/LinkWatch` | `uvicorn app.main:app --app-dir backend` + `npm --prefix frontend run dev`, then open http://localhost:5173 |
 | Best for | CI, scripting, power users, reproducing a capsule | Demos, reviewing evidence, clicking through a migration |
-| Output | Tables in the terminal + `artifacts/runs/<run-id>/` | The same run files, rendered in five tabs |
+| Output | Findings, recommendations, proposed patches + `artifacts/runs/<run-id>/` | Backend run history, findings, recommendations, verification state and capsule |
 
-The dashboard runs **locally**. It is not a hosted website: the backend reads the repository on your machine and runs
-tests in temporary copies there. Nothing is uploaded except the evidence sent to Gemma 4 when you ask for a
-recommendation.
+The dashboard runs **locally**. It is not a hosted website: the backend reads repository files on your machine.
+Evidence is sent to Gemma 4 when a recommendation or code-change proposal is requested.
 
 ### Use it on your own project, right where you work
 
@@ -36,7 +36,7 @@ cd /path/to/your-project
 ghostlib scan                     # scans the current folder; findings print as clickable file:line
 ghostlib scan --format problems   # file:line:col: severity: message (compiler style)
 ghostlib ui                       # dashboard + API on http://127.0.0.1:8000 (run `npm --prefix frontend run build` once)
-ghostlib scan https://github.com/rishrek/LinkWatch   # or a public GitHub URL (a fresh shallow clone per scan in artifacts/checkouts/)
+python -m app.cli https://github.com/rishrek/LinkWatch # full pipeline; fresh shallow clone per scan
 ```
 
 **VS Code:** copy [`integrations/vscode/tasks.json`](integrations/vscode/tasks.json) to `<your-project>/.vscode/tasks.json`.
@@ -124,31 +124,32 @@ Every statement in the dashboard and the capsule carries one of these labels:
    - private-API use and undeclared imports;
    - conflicting declarations and commented-out requirements;
    - which tests reach each usage, through direct, transitive and function-level imports.
-2. **Metadata (SOURCED):** fetches PyPI facts for the latest release and the pinned version: release dates,
-   `Requires-Python`, classifiers and yanked status. Responses are cached for 24 h in `artifacts/cache/pypi`.
+2. **Metadata and advisories (SOURCED):** fetches PyPI facts and queries OSV.dev for exact pinned versions.
+   Unpinned declarations and unavailable advisory data remain explicitly unknown.
 3. **Risk (rule-based):** a transparent points rubric (`backend/app/services/risk_engine.py`). Each indicator shows its
-   evidence, type and points. It is not a probability, not proof of abandonment, and excludes vulnerability data.
+   evidence, type and points. The rule score is not a probability or proof of safety.
 4. **Gemma 4 (AI-RECOMMENDED):** receives only the collected evidence and returns candidates, migration steps,
    breaking changes, suggested tests and uncertainties.
    - The output is validated with a strict Pydantic schema.
    - Candidate packages are then checked deterministically: PyPI existence, declared Python 3.12/3.13 support,
      stdlib presence.
    - Failures surface as `AI_UNAVAILABLE` / `AI_ERROR` / `AI_INVALID_OUTPUT`. Output is never invented.
-5. **Migration Flight Simulator (EXECUTION-VERIFIED):** **propose → review diff → approve → run → compare**.
-   - Manifest edits are deterministic. Code edits for replacements come from Gemma and are limited to the affected
-     files plus one new `tests/test_ghostlib_*.py`.
-   - Approval records the reviewer and the diff's SHA-256.
-   - The baseline and the candidate each run in their own disposable copy and uv virtualenv.
-   - The comparison covers per-test outcomes (fixed / regression / still failing), installed-version changes and
-     warnings, plus a check that the original repository is unchanged.
+5. **Migration proposals:** manifest edits are deterministic; Gemma can propose source changes for replacements.
+   The patch is reviewable and never applied to the original repository automatically.
+   - Test verification is currently **blocked**: a copied directory and virtualenv do not safely contain untrusted
+     test code. No OS/container sandbox runner is configured.
+   - Blocked runs are recorded as `not_run` / `UNKNOWN`, never as successful tests or genuine regression results.
 6. **Dependency Exit Capsule:** `capsule.json` + `capsule.md` per run. They contain:
    - dependency details, risk indicators and usage locations;
    - the proposed replacement, migration steps and suggested tests;
-   - the diff, the exact commands and the test results;
+   - the diff, Gemma call evidence, advisory results and test results only when tests actually ran;
    - compatibility gaps, open concerns and limitations;
    - reproduction and rollback instructions.
 
-### Example: real result on LinkWatch (`f52f393`, Python 3.12.14)
+### Historical LinkWatch result (`f52f393`, Python 3.12.14)
+
+These results are preserved from an earlier run. The current checkout will not reproduce them because safe test
+execution is blocked until a sandbox runner is available.
 
 | | Tests | Notes |
 |---|---|---|
@@ -173,8 +174,8 @@ Other findings from the same scan:
 ## Requirements
 
 - Python **3.12 or 3.13** (not 3.14)
-- [uv](https://docs.astral.sh/uv/) for experiment virtualenvs. It downloads Python 3.12/3.13 automatically if needed.
-  Without uv, GhostLib falls back to `venv` + `pip` using its own interpreter version.
+- An OS/container isolation runtime is required for repository test execution. No runner is configured yet, so GhostLib
+  records migration verification as blocked rather than executing tests on the host.
 - Node.js 18+ for the dashboard
 - Network access for PyPI metadata and the Gemma API (both optional; the scan still works without them)
 
@@ -204,32 +205,31 @@ ghostlib ai-check                       # verifies the model is reachable and re
 - **Access method:** Google AI Studio API key, hosted inference.
 - **Terms:** Gemma is provided under the [Gemma Terms of Use](https://ai.google.dev/gemma/terms). Use of the API is
   also subject to the Gemini API terms.
-- **What is sent:** only the collected evidence. That means declarations, PyPI facts, risk indicators, usage
-  locations with short snippets, and the bodies of functions that use the dependency. For code-change proposals, the
-  full content of the affected source files is sent too.
+- **What is sent:** collected evidence (declarations, PyPI facts, risk indicators and source context). For
+  code-change proposals, affected source files are sent after common credential/token patterns are redacted.
 - **Generation settings:** requests use JSON output mode and `thinkingConfig.thinkingLevel = "minimal"`
   (`GEMMA_THINKING_LEVEL`). Without it, Gemma 4's hidden reasoning was observed to use the entire output budget:
   8,189 thought tokens, no answer, then HTTP 500s. With it, recommendations return in about 12–22 s.
-- **AI-written tests:** they run in a second pytest pass, separate from the repository's own suite. Only the
-  repository's suite is compared against the baseline.
-- **Fallback:** without a key, every AI step reports `AI_UNAVAILABLE`. Scanning, metadata, risk, deterministic upgrade
-  and removal experiments, and the capsule all keep working.
+- **AI-written tests:** are proposals only; repository tests do not run before an appropriate sandbox exists.
+- **Fallback:** without a key, AI reports `AI_UNAVAILABLE`. Scanning, metadata, rule scoring, proposals and capsule
+  generation continue to work.
 
 ## CLI
 
 ```bash
+python -m app.cli targets/LinkWatch                  # scan + recommendations + migration proposals + capsule
 ghostlib scan targets/LinkWatch                      # scan + PyPI + risk + capsule
 ghostlib scan targets/LinkWatch --recommend          # ... + Gemma 4 for every package with score >= 1
 ghostlib recommend <run-id> toml                     # Gemma 4 for one package
 ghostlib experiment <run-id> jinja2                  # propose: prints the diff, executes nothing
-ghostlib experiment <run-id> jinja2 --approve        # run baseline + candidate tests (Python 3.12)
+ghostlib experiment <run-id> jinja2 --approve        # blocked until a safe sandbox runner is configured
 ghostlib experiment <run-id> jinja2 --approve --python 3.13
 ghostlib experiment <run-id> toml --candidate tomllib --kind stdlib   # replacement with Gemma code edits
 ghostlib experiment <run-id> jinja2 --reject         # discard the candidate workspace
 ghostlib capsule <run-id>                            # regenerate capsule.json / capsule.md
 ghostlib runs
 ghostlib auto targets/LinkWatch --top 3              # agent: scan, rank, ask Gemma, choose, prepare diffs (stops for approval)
-ghostlib auto targets/LinkWatch --top 3 --approve-all   # explicit up-front approval: also run the tests
+ghostlib auto targets/LinkWatch --top 3 --approve-all   # cannot bypass the sandbox requirement
 ghostlib learn                                       # what GhostLib has learned from past experiments
 ```
 
@@ -247,7 +247,7 @@ GhostLib improves as it tests more repositories. This is a small, explainable re
   worth migrating. That re-weights the rule score into a **learned priority**, shown next to the unchanged rule score.
 - **Memory in prompts:** past verified outcomes for a package are sent to Gemma as evidence.
 - **Agent loop:** `ghostlib auto` = scan → rank by learned priority → Gemma → choose with UCB → prepare diffs.
-  It runs nothing without approval, unless you pass `--approve-all`.
+  It does not execute repository code; `--approve-all` cannot bypass the missing sandbox.
 
 Limits: small samples are noisy, and a reward only reflects the tests a repository has.
 
@@ -262,25 +262,24 @@ cd frontend && npm ci && npm run dev                    # http://localhost:5173
 ```
 
 The dashboard has five pages:
-1. **Overview:** scan form, run history, risk ranking and repository findings.
-2. **Dependency Explorer:** declarations, PyPI facts, indicators with evidence, usage locations with a source viewer,
+1. **Overview:** local/GitHub source selector, run history, risk ranking and repository findings.
+2. **Dependency Explorer:** declarations, PyPI/OSV facts, indicators with evidence, usage locations with a source viewer,
    and relevant tests.
 3. **Migration Workbench:** Gemma recommendation with validation, candidate choice, the diff, and the approval
    checkbox with Approve or Reject.
-4. **Verification Center:** baseline vs candidate, the per-test table, command logs and warnings.
+4. **Verification Center:** baseline-vs-candidate results when available; blocked and untested runs are not presented
+   as test results.
 5. **Exit Capsule:** the rendered report with JSON and Markdown downloads.
 
 Set `VITE_API_BASE` if the API is not on `http://127.0.0.1:8000/api`.
 
 ## Safety and isolation (what is and is not provided)
 
-- Scans read files only. GhostLib never writes to the target repository. After each experiment it compares
-  `git status --porcelain` and the manifest SHA-256 hashes before and after.
-- Experiments run in **disposable copies** (without `.git`) with **separate virtualenvs**. Commands are fixed argv
-  lists with no shell, run with timeouts, and must stay inside the run directory. The environment is allow-listed,
-  so API keys and git credentials are not passed to tests.
-- **This is not a security sandbox.** The target's tests execute as the current OS user and have network access. Only
-  run GhostLib against repositories you trust.
+- Scans read files only. GhostLib never writes to the target repository.
+- Proposed patches are stored under run artifacts and must be applied by the user.
+- Test execution is blocked until an OS/container sandbox runner exists; human approval does not grant permission
+  to execute repository code on the host.
+- GitHub clone subprocesses use argument lists, disable credential prompts, and enforce timeouts.
 - Nothing is merged automatically. To adopt a candidate, review `experiments/<pkg>/proposal.diff` and apply it yourself.
 - Model output never becomes a shell command.
 
@@ -292,7 +291,8 @@ Set `VITE_API_BASE` if the API is not on `http://127.0.0.1:8000/api`.
   heuristic matches are labelled as such.
 - Test relevance comes from the import graph, not line coverage.
 - Passing tests show no regressions in the behaviour those tests exercise. They do not prove equivalence.
-- Experiments install the root `requirements*.txt` files, falling back to `pip install -e .`.
+- OSV matching requires an exact pin; ranges and unpinned dependencies have no version-specific result.
+- Migration regression verification is unavailable in the current environment because the sandbox runner is absent.
 
 ## License
 

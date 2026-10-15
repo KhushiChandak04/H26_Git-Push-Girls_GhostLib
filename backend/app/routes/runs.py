@@ -178,7 +178,10 @@ def propose(run_id: str, package: str, req: ProposeRequest):
 def approve(run_id: str, package: str, req: ApproveRequest):
     if not req.confirm:
         raise HTTPException(400, "Explicit confirmation is required to run the experiment.")
-    return _guard(experiment.approve_in_background, run_id, package, req.approved_by, req.python)
+    record = _guard(experiment.approve_in_background, run_id, package, req.approved_by, req.python)
+    if record.get("state") == "blocked":
+        generate_for_run(run_id)
+    return record
 
 
 @router.post("/runs/{run_id}/experiments/{package}/reject")

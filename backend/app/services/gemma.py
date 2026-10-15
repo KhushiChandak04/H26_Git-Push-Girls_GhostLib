@@ -21,6 +21,7 @@ from urllib.request import Request, urlopen
 from pydantic import BaseModel, Field, ValidationError
 
 from app import config
+from app.services.security import redact_text
 
 INFERENCE_METHOD = "Google AI Studio Gemini API (REST v1beta generateContent)"
 TERMS_URL = "https://ai.google.dev/gemma/terms"
@@ -186,6 +187,7 @@ def recommend_migration(evidence: dict, *, retries: int = 2) -> dict:
 def _generate(prompt: str, schema: type[BaseModel], key: str, *, retries: int = 2, max_tokens: int = 8192) -> dict:
     """Call Gemma in JSON mode. The output budget must cover Gemma 4's thinking tokens as well as
     the answer (observed: ~1.7k thought tokens for a recommendation), hence the large limits."""
+    prompt = redact_text(prompt)
     base = {"evidence_type": "AI-RECOMMENDED", **model_info(), "call_id": uuid.uuid4().hex[:16],
             "requested_at": datetime.now(timezone.utc).isoformat()}
     if not config.GEMINI_API_KEY:

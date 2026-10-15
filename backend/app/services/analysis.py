@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,6 +17,7 @@ from app.services import gemma
 from app.services.metadata import fetch_all
 from app.services.replacement import build_evidence, validate_candidates
 from app.services.risk_engine import assess_package
+from app.services.security import redact_data
 from app.services.scanner import scan_repository
 
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
@@ -39,11 +41,16 @@ def run_dir(run_id: str) -> Path:
 
 def _write(path: Path, data) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+    path.write_text(json.dumps(redact_data(data), indent=2, ensure_ascii=False, default=str), encoding="utf-8")
 
 
 def _read(path: Path):
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def new_run_id(commit: str = "nogit") -> str:
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    return f"{timestamp}-{commit[:7]}-{uuid.uuid4().hex[:8]}"
 
 
 def create_run(repository: str | Path, *, fetch_metadata: bool = True) -> dict:
@@ -63,7 +70,7 @@ def create_run(repository: str | Path, *, fetch_metadata: bool = True) -> dict:
             "status": "not_checked", "evidence_type": "UNKNOWN", "reason": "Network lookups disabled for this run."}
     scan["packages"].sort(key=lambda p: (-p["assessment"]["score"], p["normalized_name"]))
     commit = (scan.get("git") or {}).get("commit") or "nogit"
-    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + commit[:7]
+    run_id = new_run_id(commit)
     scan["run_id"] = run_id
     scan["created_at"] = datetime.now(timezone.utc).isoformat()
     scan["metadata_fetched"] = fetch_metadata
@@ -156,7 +163,7 @@ def log_ai_call(run_id: str, purpose: str, package: str, result: dict, output_re
         "output_ref": output_ref,
     }
     with (run_dir(run_id) / "ai_calls.jsonl").open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(record) + "\n")
+        fh.write(json.dumps(redact_data(record)) + "\n")
 
 
 def read_ai_calls(run_id: str) -> list[dict] | None:
