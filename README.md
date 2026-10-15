@@ -10,6 +10,20 @@ workspace**, and writes a reusable **Dependency Exit Capsule** that says exactly
 Built for the hackathon's Track 1 (Gemma 4: Dependency Resilience). The target repository is
 [rishrek/LinkWatch](https://github.com/rishrek/LinkWatch), which is analysed dynamically. No findings are hard-coded.
 
+## Two ways to use it: CLI and browser
+
+GhostLib is **one Python engine with two front doors**. Both produce identical results and artifacts.
+
+| | Terminal (CLI) | Browser (local dashboard) |
+|---|---|---|
+| Start | `pip install -e .` then `ghostlib scan targets/LinkWatch` | `uvicorn app.main:app --app-dir backend` + `npm --prefix frontend run dev`, then open http://localhost:5173 |
+| Best for | CI, scripting, power users, reproducing a capsule | Demos, reviewing evidence, clicking through a migration |
+| Output | Tables in the terminal + `artifacts/runs/<run-id>/` | The same run files, rendered in five tabs |
+
+The dashboard runs **locally**. It is not a hosted website: the backend reads the repository on your machine and runs
+tests in temporary copies there. Nothing is uploaded except the evidence sent to Gemma 4 when you ask for a
+recommendation.
+
 ## Evidence labels
 
 Every statement in the dashboard and the capsule carries one of these labels:
@@ -134,7 +148,28 @@ ghostlib experiment <run-id> toml --candidate tomllib --kind stdlib   # replacem
 ghostlib experiment <run-id> jinja2 --reject         # discard the candidate workspace
 ghostlib capsule <run-id>                            # regenerate capsule.json / capsule.md
 ghostlib runs
+ghostlib auto targets/LinkWatch --top 3              # agent: scan, rank, ask Gemma, choose, prepare diffs (stops for approval)
+ghostlib auto targets/LinkWatch --top 3 --approve-all   # explicit up-front approval: also run the tests
+ghostlib learn                                       # what GhostLib has learned from past experiments
 ```
+
+### Learning from experience (agentic mode)
+
+GhostLib improves as it tests more repositories. This is a small, explainable reinforcement-learning loop
+(a multi-armed bandit), not a trained neural model:
+
+- **Experience:** every completed experiment, on any repository, is replayed from `artifacts/runs/`. Each has a
+  reward computed only from executed tests: 1.0 = fixed failing tests with no regressions, 0.5 = nothing broke,
+  0 = something broke or the tests could not run.
+- **Choosing a fix:** each (package, kind, candidate) option is an "arm". Its value is the smoothed mean reward, and
+  untried options get an exploration bonus (UCB1). The dashboard marks the "best bet from experience".
+- **Spotting risky packages:** for each risk rule, GhostLib tracks how often a flagged package turned out to be
+  worth migrating. That re-weights the rule score into a **learned priority**, shown next to the unchanged rule score.
+- **Memory in prompts:** past verified outcomes for a package are sent to Gemma as evidence.
+- **Agent loop:** `ghostlib auto` = scan → rank by learned priority → Gemma → choose with UCB → prepare diffs.
+  It runs nothing without approval, unless you pass `--approve-all`.
+
+Limits: small samples are noisy, and a reward only reflects the tests a repository has.
 
 Artifacts are written to `artifacts/runs/<run-id>/`: `scan.json`, `recommendations/`, `baseline-py3.12/`,
 `experiments/<pkg>/` (diff, logs, junit, workspace) and `capsule/`.

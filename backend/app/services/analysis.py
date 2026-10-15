@@ -88,6 +88,8 @@ def get_run(run_id: str) -> dict:
         experiments[f.parent.name] = _read(f)
     scan["recommendations"] = recs
     scan["experiments"] = experiments
+    from app.services import memory  # local import: memory replays runs via this module
+    memory.annotate_run(scan)
     return scan
 
 
@@ -105,6 +107,13 @@ def recommend(run_id: str, package: str) -> dict:
     scan = _read(path / "scan.json")
     pkg = _package(scan, package)
     evidence = build_evidence(pkg, pkg.get("metadata"), pkg.get("assessment"), scan)
+    from app.services import memory
+    past = memory.for_package(package)
+    if past["history"]:
+        evidence["prior_outcomes_EXECUTION_VERIFIED"] = {
+            "note": "Real results of earlier GhostLib experiments for this package (possibly other repositories).",
+            "history": past["history"],
+        }
     result = gemma.recommend_migration(evidence)
     result["package"] = package
     result["evidence_sent"] = evidence

@@ -26,6 +26,7 @@ async function request(path, options = {}) {
 export const api = {
   health: () => request("/health"),
   rubric: () => request("/rubric"),
+  learning: () => request("/learning"),
   listRuns: () => request("/runs"),
   getRun: (id) => request(`/runs/${id}`),
   createRun: (repository, fetchMetadata = true) =>

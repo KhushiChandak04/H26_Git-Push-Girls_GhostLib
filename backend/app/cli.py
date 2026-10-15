@@ -15,10 +15,10 @@ import argparse
 import json
 import sys
 
-from app.services import analysis, experiment, gemma
+from app.services import agent, analysis, experiment, gemma, memory
 from app.services.capsule import generate_for_run
 
-COMMANDS = {"scan", "recommend", "experiment", "capsule", "runs", "ai-check"}
+COMMANDS = {"scan", "recommend", "experiment", "capsule", "runs", "ai-check", "auto", "learn"}
 
 
 def _print(data) -> None:
@@ -103,6 +103,23 @@ def cmd_experiment(args) -> int:
     return 0
 
 
+def cmd_learn(args) -> int:
+    s = memory.summary()
+    print(f"Learned from {s['experiments_learned_from']} verified experiments in {s['repositories_experimented']} "
+          f"repositories ({s['repositories_scanned']} repositories scanned). Policy: {s['policy']}")
+    print()
+    print("Replacement options (arms):")
+    for a in s["arms"]:
+        print(f"  {a['package']:<12} {a['kind']:<8} {a['candidate']:<14} tries {a['tries']}  mean reward {a['value']}  ucb {a['ucb']}")
+    print()
+    print("Risk rules, how often a flagged package was worth migrating:")
+    for i in s["indicators"]:
+        print(f"  {i['indicator']:<30} {i['worth_migrating']}/{i['experiments']}  (smoothed {i['precision']})")
+    for lim in s["limitations"]:
+        print("  note:", lim)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] not in COMMANDS and not argv[0].startswith("-"):
@@ -136,6 +153,19 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--approve", action="store_true")
     g.add_argument("--reject", action="store_true")
     p.set_defaults(func=cmd_experiment)
+
+    p = sub.add_parser("auto", help="Agent: scan, rank with learned priority, ask Gemma, choose, prepare diffs")
+    p.add_argument("repository")
+    p.add_argument("--top", type=int, default=3, help="How many packages to work on")
+    p.add_argument("--python", default="3.12", choices=["3.12", "3.13"])
+    p.add_argument("--no-gemma", action="store_true")
+    p.add_argument("--approve-all", action="store_true",
+                   help="Explicitly pre-approve running tests for every prepared candidate in this invocation")
+    p.set_defaults(func=lambda a: (agent.auto(a.repository, top=a.top, approve_all=a.approve_all, python=a.python,
+                                              ask_gemma=not a.no_gemma), 0)[1])
+
+    p = sub.add_parser("learn", help="Show what GhostLib has learned from past verified experiments")
+    p.set_defaults(func=cmd_learn)
 
     p = sub.add_parser("capsule", help="(Re)generate capsule.json and capsule.md for a run")
     p.add_argument("run_id")

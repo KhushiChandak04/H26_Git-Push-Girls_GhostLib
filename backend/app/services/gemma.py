@@ -80,6 +80,8 @@ Rules:
 - The target runtime is Python 3.12 and 3.13.
 - Only refer to files that appear in the evidence.
 - List what you are unsure about in "uncertainties".
+- If EVIDENCE contains prior_outcomes_EXECUTION_VERIFIED, those are real past test results: prefer candidates
+  that previously produced no regressions, and mention past failures in "uncertainties".
 Respond with ONLY a JSON object matching this shape (no markdown fences):
 """
 

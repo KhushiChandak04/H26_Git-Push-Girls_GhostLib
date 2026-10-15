@@ -55,6 +55,12 @@ def risk_rubric():
     return rubric()
 
 
+@router.get("/learning")
+def learning():
+    from app.services import memory
+    return memory.summary()
+
+
 @router.get("/ai/status")
 def ai_status():
     return gemma.verify_model()

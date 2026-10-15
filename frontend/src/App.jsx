@@ -126,17 +126,19 @@ function Overview({ run, runs, openRun, scan, go }) {
         <section className="panel">
           <h2>Haunted packages</h2>
           <p className="muted small">Ranked by a transparent rule score. Each point links to its evidence; it is not a probability.</p>
-          <div className="row head"><span>Package</span><span>Declared</span><span>Usages</span><span>Risk</span></div>
+          <div className="row head"><span>Package</span><span>Declared</span><span>Usages</span><span>Risk (rules) · learned priority</span></div>
           {pkgs.map((p) => (
             <button key={p.normalized_name} className="row" onClick={() => go("Dependencies", p.normalized_name)}>
               <code>{p.normalized_name}{p.groups.includes("dev") ? " (dev)" : ""}</code>
               <span className="muted">{[...new Set(p.declarations.map((d) => d.specifier || "any"))].join(" vs ")}</span>
               <span className="muted">{p.locations.length} usages</span>
-              <span><span className={`band band-${p.assessment.band}`}>{p.assessment.band} · {p.assessment.score}</span></span>
+              <span><span className={`band band-${p.assessment.band}`}>{p.assessment.band} · {p.assessment.score}</span>
+                {p.learned && <span className="muted small" title={p.learned.priority.basis}> · {p.learned.priority.value}</span>}</span>
             </button>
           ))}
         </section>
         <ScoreSources />
+        <Learning />
         <section className="panel">
           <h2>Repository findings</h2>
           {run.undeclared_imports.map((u) => <div className="ev" key={u.import_name}><div><strong>Undeclared import <code>{u.import_name}</code></strong>
@@ -169,6 +171,32 @@ function ScoreSources() {
             <td><Chip claim={r.evidence_type} /> {r.source}</td><td>{r.description}</td></tr>)}</tbody>
         </table>
       </details>
+    </section>
+  );
+}
+
+function Learning() {
+  const [m, setM] = useState(null);
+  useEffect(() => { api.learning().then(setM).catch(() => {}); }, []);
+  if (!m) return null;
+  return (
+    <section className="panel">
+      <h2>What GhostLib has learned</h2>
+      <p>From <b>{m.experiments_learned_from}</b> verified experiments across <b>{m.repositories_experimented}</b> repositor{m.repositories_experimented === 1 ? "y" : "ies"}
+        {" "}({m.repositories_scanned} scanned). Every test run GhostLib executes becomes experience: the more repositories it tests, the better it
+        ranks risky packages and picks replacements. <Chip claim="EXECUTION-VERIFIED" /></p>
+      <p className="muted small">Reward per experiment: 1.0 = fixed failing tests with no regressions, 0.5 = nothing broke, 0 = something broke. {m.policy}</p>
+      {m.arms.length > 0 ? <table className="cmp">
+        <thead><tr><th>Replacement tried</th><th>Times</th><th>Avg. reward</th><th>Repos</th></tr></thead>
+        <tbody>{m.arms.map((a) => <tr key={a.package + a.kind + a.candidate}><td><code>{a.package}</code> → {a.requirements[0] || a.candidate} <span className="muted">({a.kind})</span></td>
+          <td>{a.tries}</td><td>{a.value}</td><td>{a.repositories.length}</td></tr>)}</tbody>
+      </table> : <p className="empty">Nothing learned yet. Run an experiment in the Migration tab.</p>}
+      {m.indicators.length > 0 && <details className="more"><summary>Which risk rules have been most predictive</summary>
+        <table className="cmp"><thead><tr><th>Rule</th><th>Flagged packages worth migrating</th><th>Learned weight</th></tr></thead>
+          <tbody>{m.indicators.map((i) => <tr key={i.indicator}><td><code>{i.indicator.replaceAll("_", " ")}</code></td>
+            <td>{i.worth_migrating} / {i.experiments}</td><td>{(2 * i.precision).toFixed(2)}×</td></tr>)}</tbody></table>
+        <ul>{m.limitations.map((l, i) => <li key={i} className="muted small">{l}</li>)}</ul>
+      </details>}
     </section>
   );
 }
@@ -353,6 +381,14 @@ function Migration({ run, health, selected, select, refresh, go, setWarn }) {
               <header><code>{c.package}</code><span className="state">{KIND[c.kind] || c.kind}</span></header>
               <p>{c.rationale}</p>
               <p className="small">{c.ai ? <Chip claim="AI-RECOMMENDED" /> : <span className="muted">Suggested by GhostLib (no AI)</span>} {checkText(c.v)}</p>
+              {(() => {
+                const arm = (p.learned?.arms || []).find((a) => a.kind === c.kind && a.candidate === c.package);
+                const best = p.learned?.best_bet;
+                return <>
+                  {arm && <p className="small">Past results: tried {arm.tries}× in {arm.repositories.length} repo{arm.repositories.length === 1 ? "" : "s"}, avg. reward {arm.value} <Chip claim="EXECUTION-VERIFIED" /></p>}
+                  {best && best.kind === c.kind && best.candidate === c.package && <p className="small"><span className="state state-completed">best bet from experience</span></p>}
+                </>;
+              })()}
               <button className="btn-bone" disabled={!!busy || exp?.state === "running"} onClick={() => propose(c.package, c.kind)}>
                 {busy === "propose" ? "Preparing..." : "Use this"}</button>
             </article>
