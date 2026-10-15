@@ -1,0 +1,2 @@
+import Panel from "../components/Panel.jsx";
+export default function DependencyExplorer() { return <Panel title="Dependency Explorer" eyebrow="STATIC ANALYSIS"><div className="empty-state"><span className="empty-icon">⌘</span><h3>Run a scan to populate dependency evidence</h3><p>Planned: normalized package names, manifest constraints, static import usage, metadata provenance and explainable review indicators.</p><p className="muted">Static analysis cannot reliably resolve dynamic imports, plugins, extras or every package-to-import name mapping.</p></div></Panel>; }
