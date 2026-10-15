@@ -37,6 +37,9 @@ def _reward(exp: dict) -> float | None:
     counts = cmp_.get("counts") or {}
     if cmp_.get("verdict") in ("regressions_detected", "insufficient_evidence"):
         return 0.0
+    if cmp_.get("verdict") == "baseline_could_not_run":
+        # The original could not even be installed; a candidate whose tests all pass is a clear win.
+        return 1.0 if (exp.get("candidate_run") or {}).get("status") == "passed" else 0.5
     if (exp.get("candidate_run") or {}).get("status") == "could_not_run":
         return 0.0
     return 1.0 if counts.get("fixed", 0) > 0 else 0.5

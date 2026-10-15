@@ -18,6 +18,7 @@ SCORE_BANDS = ((6, "high"), (3, "medium"), (1, "low"), (0, "none"))
 RUBRIC = {
     "declaration_conflict": 3,
     "pinned_python_incompatible": 3,
+    "pinned_not_installable": 3,
     "pinned_version_yanked": 3,
     "inactive_development_status": 3,
     "no_release_in_years": 2,
@@ -35,6 +36,7 @@ RUBRIC = {
 RULE_DOCS = {
     "declaration_conflict": ("OBSERVED", "Manifests", "The same package is pinned differently in two manifest files."),
     "pinned_python_incompatible": ("SOURCED", "PyPI", "The pinned version's Requires-Python excludes Python 3.12 or 3.13."),
+    "pinned_not_installable": ("SOURCED", "PyPI files", "The pinned release ships no wheel or source for Python 3.12/3.13, so it cannot be installed there (checked from the actual wheel tags; common for old ML releases)."),
     "pinned_version_yanked": ("SOURCED", "PyPI", "The pinned version was yanked (or is missing) on PyPI."),
     "inactive_development_status": ("SOURCED", "PyPI", "The package marks itself Inactive or Obsolete."),
     "no_release_in_years": ("SOURCED", "PyPI", f"No release uploaded in {STALE_YEARS}+ years (a maintenance signal, not proof of abandonment)."),
@@ -146,6 +148,13 @@ def assess_package(pkg: dict, metadata: dict | None = None) -> dict:
             if pinned.get("yanked"):
                 indicators.append(_indicator("pinned_version_yanked", "SOURCED",
                                              f"Pinned version {pinned['version']} is yanked on PyPI.", psrc))
+            inst = pinned.get("installable") or {}
+            missing = [v for v, how in inst.items() if how == "none"]
+            if missing:
+                indicators.append(_indicator(
+                    "pinned_not_installable", "SOURCED",
+                    f"Pinned {pinned['version']} has no wheel or source distribution for Python {', '.join(missing)} "
+                    "(from its PyPI file list). It cannot be installed there.", psrc, installable=inst))
             rp = pinned.get("requires_python")
             if rp:
                 try:

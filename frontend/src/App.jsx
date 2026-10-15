@@ -552,6 +552,9 @@ function Verdict({ c }) {
   const s = (k, one, many) => `${n[k]} ${n[k] === 1 ? one : many}`;
   if (c.verdict === "regressions_detected")
     return <strong className="v-bad">Breaks something: {s("regression", "test that passed before now fails", "tests that passed before now fail")}.</strong>;
+  if (c.verdict === "baseline_could_not_run")
+    return <strong className="v-good">The current dependencies cannot even be installed on this Python version; with the change, {n.new_in_candidate} test{n.new_in_candidate === 1 ? "" : "s"} ran
+      {c.candidate_status === "passed" ? " and all passed." : " (see results below)."}</strong>;
   if (c.verdict === "insufficient_evidence")
     return <strong className="v-warn">Not enough evidence: the tests could not run on one of the copies.</strong>;
   const fixed = n.fixed ? ` It also fixes ${s("fixed", "test that was failing", "tests that were failing")}.` : "";

@@ -69,6 +69,32 @@ def _upload_time(files: list[dict]) -> str | None:
     return min(times) if times else None
 
 
+def installability(files: list[dict], targets=("3.12", "3.13")) -> dict:
+    """Can the pinned release be installed on each target Python? Read from the real wheel tags.
+
+    "wheel" = a compatible pre-built wheel exists; "source_build" = only an sdist (may need compilers);
+    "none" = nothing installable (common for old ML releases such as tensorflow 2.10 on Python 3.12).
+    """
+    wheels = [f.get("filename", "") for f in files if f.get("packagetype") == "bdist_wheel"]
+    has_sdist = any(f.get("packagetype") == "sdist" for f in files)
+    out = {}
+    for t in targets:
+        minor = int(t.split(".")[1])
+        ok = False
+        for name in wheels:
+            parts = name[:-4].split("-")
+            if len(parts) < 5:
+                continue
+            py_tags, abi_tags = parts[-3].split("."), parts[-2].split(".")
+            for tag in py_tags:
+                if tag in ("py3", "py2.py3") or tag == f"cp3{minor}" or tag == f"py3{minor}":
+                    ok = True
+                elif tag.startswith("cp3") and "abi3" in abi_tags and tag[3:].isdigit() and int(tag[3:]) <= minor:
+                    ok = True
+        out[t] = "wheel" if ok else ("source_build" if has_sdist else "none")
+    return out
+
+
 def get_package_metadata(package_name: str, *, pinned_version: str | None = None,
                          allow_network: bool = True, timeout: float = 8.0) -> dict:
     if not allow_network:
@@ -118,6 +144,7 @@ def get_package_metadata(package_name: str, *, pinned_version: str | None = None
                 "requires_python": vinfo.get("requires_python"),
                 "python_classifiers": _python_classifiers(vinfo.get("classifiers") or []),
                 "has_wheels": any(f.get("packagetype") == "bdist_wheel" for f in files),
+                "installable": installability(files),
                 "source": vurl if vdata else None,
                 "fetch_status": vfetch["status"],
             }

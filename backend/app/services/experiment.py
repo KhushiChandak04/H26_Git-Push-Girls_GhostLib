@@ -243,7 +243,9 @@ def compare(baseline: dict, candidate: dict) -> dict:
                        for k in sorted(set(bi) | set(ci)) if bi.get(k) != ci.get(k)}
     bw, cw = set(baseline.get("warnings", [])), set(candidate.get("warnings", []))
     regressions = [r for r in rows if r["change"] in ("regression", "missing_in_candidate")]
-    if not (b and c):
+    if baseline.get("status") == "could_not_run" and c:
+        verdict = "baseline_could_not_run"
+    elif not (b and c):
         verdict = "insufficient_evidence"
     elif regressions:
         verdict = "regressions_detected"
@@ -253,6 +255,8 @@ def compare(baseline: dict, candidate: dict) -> dict:
         verdict = "no_regressions_observed"
     return {
         "verdict": verdict,
+        "baseline_status": baseline.get("status"), "baseline_blocker": baseline.get("blocker"),
+        "candidate_status": candidate.get("status"),
         "tests": rows,
         "counts": {k: sum(1 for r in rows if r["change"] == k) for k in
                    ("fixed", "regression", "still_failing", "unchanged_pass", "new_in_candidate", "missing_in_candidate")},
