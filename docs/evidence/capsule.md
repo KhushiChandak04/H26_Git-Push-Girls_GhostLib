@@ -1,6 +1,6 @@
 # Dependency Exit Capsule — linkwatch
 
-- Generated: 2026-10-15T11:12:10.195460+00:00 by ghostlib 0.2.0 (run `20261015T082337Z-f52f393`)
+- Generated: 2026-10-15T11:40:13.974793+00:00 by ghostlib 0.2.0 (run `20261015T082337Z-f52f393`)
 - Repository: https://github.com/rishrek/LinkWatch.git @ `f52f3930c8e7c33d934ccf614955a38e26984bd5`
 - Declared requires-python: `>=3.10`; targets: Python 3.12 / 3.13
 - AI: gemma-4-26b-a4b-it via Google AI Studio Gemini API (REST v1beta generateContent) (configured: True; terms: https://ai.google.dev/gemma/terms)
@@ -55,6 +55,8 @@
 
 **Declarations [OBSERVED]:** `pydantic==1.10.13` (`requirements.txt:5`); `pydantic>=2` (`pyproject.toml:17`)
 **PyPI [SOURCED]:** latest 2.14.1, last upload 2026-10-11, requires-python `>=3.10`; pinned 1.10.13 released 2023-09-27 — <https://pypi.org/pypi/pydantic/json> (retrieved 2026-10-15T07:56:50)
+**Known vulnerabilities [SOURCED, OSV.dev, not part of the risk score]:** 0 unique issue(s) for 1.10.13: none
+- Candidate resolves 0 of 0 advisory IDs (By comparing the candidate version with OSV 'fixed' versions; not a security test.)
 
 **Risk indicators:**
 - [OBSERVED] `declaration_conflict` (+3): Declared with different constraints: requirements.txt:5 -> ==1.10.13; pyproject.toml:17 -> >=2
@@ -219,6 +221,8 @@
 
 **Declarations [OBSERVED]:** `appdirs==1.4.4` (`requirements.txt:2`); `appdirs==1.4.4` (`pyproject.toml:14`)
 **PyPI [SOURCED]:** latest 1.4.4, last upload 2020-05-11, requires-python ``; pinned 1.4.4 released 2020-05-11 — <https://pypi.org/pypi/appdirs/json> (retrieved 2026-10-15T07:56:50)
+**Known vulnerabilities [SOURCED, OSV.dev, not part of the risk score]:** 0 unique issue(s) for 1.4.4: none
+- Candidate resolves 0 of 0 advisory IDs (By comparing the candidate version with OSV 'fixed' versions; not a security test.)
 
 **Risk indicators:**
 - [SOURCED] `no_release_in_years` (+2): Most recent upload to PyPI was 2020-05-11 (6.4 years ago). Signals low maintenance activity; it does not by itself prove abandonment.
@@ -363,6 +367,8 @@
 
 **Declarations [OBSERVED]:** `idna==2.7` (`requirements.txt:10`); `idna==2.7` (`pyproject.toml:22`)
 **PyPI [SOURCED]:** latest 3.20, last upload 2026-09-17, requires-python `>=3.9`; pinned 2.7 released 2018-06-11 — <https://pypi.org/pypi/idna/json> (retrieved 2026-10-15T07:56:50)
+**Known vulnerabilities [SOURCED, OSV.dev, not part of the risk score]:** 2 unique issue(s) for 2.7: [GHSA-65pc-fj4g-8rjx](https://osv.dev/vulnerability/GHSA-65pc-fj4g-8rjx), [GHSA-jjg7-2v4v-x38h](https://osv.dev/vulnerability/GHSA-jjg7-2v4v-x38h), [PYSEC-2024-60](https://osv.dev/vulnerability/PYSEC-2024-60), [PYSEC-2026-215](https://osv.dev/vulnerability/PYSEC-2026-215)
+- Candidate resolves 4 of 4 advisory IDs (By comparing the candidate version with OSV 'fixed' versions; not a security test.)
 
 **Risk indicators:**
 - [SOURCED] `pinned_major_behind_latest` (+2): Pinned 2.7 is a major version behind latest 3.20.
@@ -446,6 +452,8 @@
 
 **Declarations [OBSERVED]:** `requests==2.31.0` (`requirements.txt:3`); `requests==2.31.0` (`pyproject.toml:15`)
 **PyPI [SOURCED]:** latest 2.34.2, last upload 2026-05-14, requires-python `>=3.10`; pinned 2.31.0 released 2023-05-22 — <https://pypi.org/pypi/requests/json> (retrieved 2026-10-15T07:56:54)
+**Known vulnerabilities [SOURCED, OSV.dev, not part of the risk score]:** 3 unique issue(s) for 2.31.0: [GHSA-9hjg-9r4m-mvj7](https://osv.dev/vulnerability/GHSA-9hjg-9r4m-mvj7), [GHSA-9wx4-h78v-vm56](https://osv.dev/vulnerability/GHSA-9wx4-h78v-vm56), [GHSA-gc5v-m9x4-r6x2](https://osv.dev/vulnerability/GHSA-gc5v-m9x4-r6x2), [PYSEC-2026-1872](https://osv.dev/vulnerability/PYSEC-2026-1872), [PYSEC-2026-1873](https://osv.dev/vulnerability/PYSEC-2026-1873), [PYSEC-2026-2275](https://osv.dev/vulnerability/PYSEC-2026-2275)
+- Candidate resolves 6 of 6 advisory IDs (By comparing the candidate version with OSV 'fixed' versions; not a security test.)
 
 **Risk indicators:**
 - [OBSERVED] `private_api_usage` (+2): Uses private API _parse_content_type_header — not covered by the package's compatibility promises.
@@ -628,6 +636,8 @@
 
 **Declarations [OBSERVED]:** `toml==0.10.2` (`requirements.txt:1`); `toml==0.10.2` (`pyproject.toml:13`)
 **PyPI [SOURCED]:** latest 0.10.2, last upload 2020-11-01, requires-python `>=2.6, !=3.0.*, !=3.1.*, !=3.2.*`; pinned 0.10.2 released 2020-11-01 — <https://pypi.org/pypi/toml/json> (retrieved 2026-10-15T07:56:56)
+**Known vulnerabilities [SOURCED, OSV.dev, not part of the risk score]:** 0 unique issue(s) for 0.10.2: none
+- Candidate resolves 0 of 0 advisory IDs (The candidate removes this package's runtime declaration. Build-time requirements (e.g. [build-system] requires) are not changed by GhostLib.)
 
 **Risk indicators:**
 - [SOURCED] `no_release_in_years` (+2): Most recent upload to PyPI was 2020-11-01 (6.0 years ago). Signals low maintenance activity; it does not by itself prove abandonment.
@@ -760,6 +770,8 @@
 
 **Declarations [OBSERVED]:** `chardet==5.2.0` (`requirements.txt:8`); `chardet==5.2.0` (`pyproject.toml:20`)
 **PyPI [SOURCED]:** latest 7.6.0, last upload 2026-08-14, requires-python `>=3.10`; pinned 5.2.0 released 2023-08-01 — <https://pypi.org/pypi/chardet/json> (retrieved 2026-10-15T07:56:50)
+**Known vulnerabilities [SOURCED, OSV.dev, not part of the risk score]:** 0 unique issue(s) for 5.2.0: none
+- Candidate resolves 0 of 0 advisory IDs (By comparing the candidate version with OSV 'fixed' versions; not a security test.)
 
 **Risk indicators:**
 - [SOURCED] `pinned_major_behind_latest` (+2): Pinned 5.2.0 is a major version behind latest 7.6.0.
@@ -877,6 +889,8 @@
 
 **Declarations [OBSERVED]:** `Jinja2==2.11.3` (`requirements.txt:4`); `Jinja2==2.11.3` (`pyproject.toml:16`)
 **PyPI [SOURCED]:** latest 3.1.6, last upload 2025-03-05, requires-python `>=3.7`; pinned 2.11.3 released 2021-01-31 — <https://pypi.org/pypi/jinja2/json> (retrieved 2026-10-15T07:56:50)
+**Known vulnerabilities [SOURCED, OSV.dev, not part of the risk score]:** 4 unique issue(s) for 2.11.3: [GHSA-cpwx-vrp4-4pq7](https://osv.dev/vulnerability/GHSA-cpwx-vrp4-4pq7), [GHSA-h5c8-rqwp-cp95](https://osv.dev/vulnerability/GHSA-h5c8-rqwp-cp95), [GHSA-h75v-3vvj-5mfj](https://osv.dev/vulnerability/GHSA-h75v-3vvj-5mfj), [GHSA-q2x7-8rv6-6q7h](https://osv.dev/vulnerability/GHSA-q2x7-8rv6-6q7h), [PYSEC-2026-1471](https://osv.dev/vulnerability/PYSEC-2026-1471), [PYSEC-2026-1473](https://osv.dev/vulnerability/PYSEC-2026-1473), [PYSEC-2026-1474](https://osv.dev/vulnerability/PYSEC-2026-1474), [PYSEC-2026-1475](https://osv.dev/vulnerability/PYSEC-2026-1475)
+- Candidate resolves 8 of 8 advisory IDs (By comparing the candidate version with OSV 'fixed' versions; not a security test.)
 
 **Risk indicators:**
 - [SOURCED] `pinned_major_behind_latest` (+2): Pinned 2.11.3 is a major version behind latest 3.1.6.
@@ -954,6 +968,8 @@
 
 **Declarations [OBSERVED]:** `nose==1.3.7` (`requirements-dev.txt:2`)
 **PyPI [SOURCED]:** latest 1.3.7, last upload 2015-06-02, requires-python `None`; pinned 1.3.7 released 2015-06-02 — <https://pypi.org/pypi/nose/json> (retrieved 2026-10-15T07:56:50)
+**Known vulnerabilities [SOURCED, OSV.dev, not part of the risk score]:** 0 unique issue(s) for 1.3.7: none
+- Candidate resolves 0 of 0 advisory IDs (By comparing the candidate version with OSV 'fixed' versions; not a security test.)
 
 **Risk indicators:**
 - [SOURCED] `no_release_in_years` (+2): Most recent upload to PyPI was 2015-06-02 (11.4 years ago). Signals low maintenance activity; it does not by itself prove abandonment.
@@ -1021,6 +1037,8 @@
 
 **Declarations [OBSERVED]:** `setuptools==75.8.0` (`requirements.txt:9`); `setuptools==75.8.0` (`pyproject.toml:21`)
 **PyPI [SOURCED]:** latest 84.0.0, last upload 2026-08-08, requires-python `>=3.10`; pinned 75.8.0 released 2025-01-08 — <https://pypi.org/pypi/setuptools/json> (retrieved 2026-10-15T07:56:55)
+**Known vulnerabilities [SOURCED, OSV.dev, not part of the risk score]:** 2 unique issue(s) for 75.8.0: [GHSA-5rjg-fvgr-3xxf](https://osv.dev/vulnerability/GHSA-5rjg-fvgr-3xxf), [GHSA-h35f-9h28-mq5c](https://osv.dev/vulnerability/GHSA-h35f-9h28-mq5c), [PYSEC-2025-49](https://osv.dev/vulnerability/PYSEC-2025-49), [PYSEC-2026-3447](https://osv.dev/vulnerability/PYSEC-2026-3447)
+- Candidate resolves 4 of 4 advisory IDs (The candidate removes this package's runtime declaration. Build-time requirements (e.g. [build-system] requires) are not changed by GhostLib.)
 
 **Risk indicators:**
 - [SOURCED] `pinned_major_behind_latest` (+2): Pinned 75.8.0 is a major version behind latest 84.0.0.
@@ -1142,6 +1160,7 @@
 
 **Declarations [OBSERVED]:** `six` (`requirements.txt:7`); `six` (`pyproject.toml:19`)
 **PyPI [SOURCED]:** latest 1.17.0, last upload 2024-12-04, requires-python `!=3.0.*,!=3.1.*,!=3.2.*,>=2.7` — <https://pypi.org/pypi/six/json> (retrieved 2026-10-15T07:56:56)
+**Known vulnerabilities [UNKNOWN]:** not_checked: No exact version is pinned, so advisories cannot be matched to a version.
 
 **Risk indicators:**
 - [OBSERVED] `declared_not_imported` (+1): No static import of six was found in scanned Python files. It may be unused, or used indirectly/dynamically.
@@ -1219,6 +1238,7 @@
 
 **Declarations [OBSERVED]:** `click>=7` (`requirements.txt:6`); `click>=7` (`pyproject.toml:18`)
 **PyPI [SOURCED]:** latest 8.5.0, last upload 2026-08-26, requires-python `>=3.10` — <https://pypi.org/pypi/click/json> (retrieved 2026-10-15T07:56:50)
+**Known vulnerabilities [UNKNOWN]:** not_checked: No exact version is pinned, so advisories cannot be matched to a version.
 
 **Risk indicators:**
 - none
@@ -1255,6 +1275,7 @@
 
 **Declarations [OBSERVED]:** `pytest` (`requirements-dev.txt:1`)
 **PyPI [SOURCED]:** latest 9.1.1, last upload 2026-06-19, requires-python `>=3.10` — <https://pypi.org/pypi/pytest/json> (retrieved 2026-10-15T07:56:51)
+**Known vulnerabilities [UNKNOWN]:** not_checked: No exact version is pinned, so advisories cannot be matched to a version.
 
 **Risk indicators:**
 - [OBSERVED] `unconstrained_version` (+0): No version constraint declared (requirements-dev.txt:1). Installs are not reproducible.
@@ -1287,6 +1308,7 @@
 
 **Declarations [OBSERVED]:** `python-dateutil` (`requirements.txt:11`); `python-dateutil` (`pyproject.toml:23`)
 **PyPI [SOURCED]:** latest 2.9.0.post0, last upload 2024-03-01, requires-python `!=3.0.*,!=3.1.*,!=3.2.*,>=2.7` — <https://pypi.org/pypi/python-dateutil/json> (retrieved 2026-10-15T07:56:53)
+**Known vulnerabilities [UNKNOWN]:** not_checked: No exact version is pinned, so advisories cannot be matched to a version.
 
 **Risk indicators:**
 - [OBSERVED] `unconstrained_version` (+0): No version constraint declared (requirements.txt:11, pyproject.toml:23). Installs are not reproducible.
@@ -1322,6 +1344,7 @@
 
 **Declarations [OBSERVED]:** `rich` (`requirements.txt:12`); `rich` (`pyproject.toml:24`)
 **PyPI [SOURCED]:** latest 15.0.0, last upload 2026-04-12, requires-python `>=3.9.0` — <https://pypi.org/pypi/rich/json> (retrieved 2026-10-15T07:56:54)
+**Known vulnerabilities [UNKNOWN]:** not_checked: No exact version is pinned, so advisories cannot be matched to a version.
 
 **Risk indicators:**
 - [OBSERVED] `unconstrained_version` (+0): No version constraint declared (requirements.txt:12, pyproject.toml:24). Installs are not reproducible.

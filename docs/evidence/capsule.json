@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-10-15T11:12:10.195460+00:00",
+  "generated_at": "2026-10-15T11:40:13.974793+00:00",
   "generated_by": "ghostlib 0.2.0",
   "run_id": "20261015T082337Z-f52f393",
   "evidence_legend": {
@@ -59,9 +59,11 @@
     },
     "calls": [
       {
+        "call_id": null,
         "purpose": "code change proposal",
         "package": "idna",
         "status": "not_needed",
+        "error": "No source file imports idna; only manifests change.",
         "model_requested": null,
         "model_version_returned": null,
         "requested_at": null,
@@ -74,9 +76,11 @@
         "inference_method": null
       },
       {
+        "call_id": null,
         "purpose": "code change proposal",
         "package": "nose",
         "status": "not_needed",
+        "error": "No source file imports nose; only manifests change.",
         "model_requested": null,
         "model_version_returned": null,
         "requested_at": null,
@@ -89,9 +93,11 @@
         "inference_method": null
       },
       {
+        "call_id": null,
         "purpose": "code change proposal",
         "package": "six",
         "status": "not_needed",
+        "error": "No source file imports six; only manifests change.",
         "model_requested": null,
         "model_version_returned": null,
         "requested_at": null,
@@ -104,9 +110,11 @@
         "inference_method": null
       },
       {
+        "call_id": null,
         "purpose": "replacement recommendation",
         "package": "idna",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T09:30:54.826733+00:00",
@@ -119,9 +127,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "replacement recommendation",
         "package": "appdirs",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T09:30:54.985442+00:00",
@@ -134,9 +144,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "replacement recommendation",
         "package": "pydantic",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T09:30:55.016260+00:00",
@@ -149,9 +161,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "replacement recommendation",
         "package": "requests",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T09:31:10.138115+00:00",
@@ -164,9 +178,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "replacement recommendation",
         "package": "toml",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T09:31:17.050147+00:00",
@@ -179,9 +195,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "replacement recommendation",
         "package": "chardet",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T09:31:18.928149+00:00",
@@ -194,9 +212,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "replacement recommendation",
         "package": "jinja2",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T09:31:30.685991+00:00",
@@ -209,9 +229,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "replacement recommendation",
         "package": "nose",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T09:31:32.100299+00:00",
@@ -224,9 +246,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "replacement recommendation",
         "package": "setuptools",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T09:31:34.434206+00:00",
@@ -239,9 +263,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "replacement recommendation",
         "package": "six",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T09:31:44.459829+00:00",
@@ -254,9 +280,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "code change proposal",
         "package": "toml",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T09:32:18.548010+00:00",
@@ -269,9 +297,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "replacement recommendation",
         "package": "pytest",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T11:00:03.918637+00:00",
@@ -284,9 +314,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "replacement recommendation",
         "package": "click",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T11:01:57.580983+00:00",
@@ -299,9 +331,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "replacement recommendation",
         "package": "python-dateutil",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T11:02:12.379907+00:00",
@@ -314,9 +348,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "replacement recommendation",
         "package": "rich",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T11:02:35.761105+00:00",
@@ -329,9 +365,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "code change proposal",
         "package": "pydantic",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T11:03:15.085717+00:00",
@@ -344,9 +382,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "code change proposal",
         "package": "appdirs",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T11:03:35.058940+00:00",
@@ -359,9 +399,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "code change proposal",
         "package": "requests",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T11:04:28.832449+00:00",
@@ -374,9 +416,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "code change proposal",
         "package": "chardet",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T11:04:55.097189+00:00",
@@ -389,9 +433,11 @@
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       },
       {
+        "call_id": null,
         "purpose": "code change proposal",
         "package": "setuptools",
         "status": "ok",
+        "error": null,
         "model_requested": "gemma-4-26b-a4b-it",
         "model_version_returned": "gemma-4-26b-a4b-it",
         "requested_at": "2026-10-15T11:05:22.002247+00:00",
@@ -403,7 +449,18 @@
         "finish_reason": "STOP",
         "inference_method": "Google AI Studio Gemini API (REST v1beta generateContent)"
       }
-    ]
+    ],
+    "call_log_source": "derived from saved recommendation/proposal files (latest per package)"
+  },
+  "run_status": {
+    "status": "complete",
+    "packages": 14,
+    "at_risk": 10,
+    "recommendations_ok": 14,
+    "experiments_completed": 10,
+    "experiments_failed": [],
+    "untested_at_risk": [],
+    "running": []
   },
   "summary": {
     "manifests": [
@@ -437,7 +494,13 @@
       ]
     },
     "ai_recommendations_ok": 14,
-    "experiments_completed": 10
+    "experiments_completed": 10,
+    "known_advisories": {
+      "idna": 2,
+      "requests": 3,
+      "jinja2": 4,
+      "setuptools": 2
+    }
   },
   "repository_findings": {
     "evidence_type": "OBSERVED",
@@ -645,8 +708,26 @@
           }
         ]
       },
+      "advisories": {
+        "status": "checked",
+        "evidence_type": "SOURCED",
+        "version": "1.10.13",
+        "source": "https://api.osv.dev/v1/querybatch",
+        "retrieved_at": "2026-10-15T11:35:51.726759+00:00",
+        "count": 0,
+        "unique_issues": 0,
+        "vulnerabilities": [],
+        "note": "Informational; not part of the risk score.",
+        "candidate_resolution": {
+          "candidate_version": "2.14.1",
+          "resolved": [],
+          "not_resolved": [],
+          "note": "By comparing the candidate version with OSV 'fixed' versions; not a security test."
+        }
+      },
       "recommendation": {
         "evidence_type": "AI-RECOMMENDED",
+        "call_id": null,
         "status": "ok",
         "reason": null,
         "model": "gemma-4-26b-a4b-it",
@@ -1351,8 +1432,26 @@
           }
         ]
       },
+      "advisories": {
+        "status": "checked",
+        "evidence_type": "SOURCED",
+        "version": "1.4.4",
+        "source": "https://api.osv.dev/v1/querybatch",
+        "retrieved_at": "2026-10-15T11:35:51.726759+00:00",
+        "count": 0,
+        "unique_issues": 0,
+        "vulnerabilities": [],
+        "note": "Informational; not part of the risk score.",
+        "candidate_resolution": {
+          "candidate_version": "4.13.0",
+          "resolved": [],
+          "not_resolved": [],
+          "note": "By comparing the candidate version with OSV 'fixed' versions; not a security test."
+        }
+      },
       "recommendation": {
         "evidence_type": "AI-RECOMMENDED",
+        "call_id": null,
         "status": "ok",
         "reason": null,
         "model": "gemma-4-26b-a4b-it",
@@ -2083,8 +2182,84 @@
         "coverage_gap": false,
         "locations": []
       },
+      "advisories": {
+        "status": "checked",
+        "evidence_type": "SOURCED",
+        "version": "2.7",
+        "source": "https://api.osv.dev/v1/querybatch",
+        "retrieved_at": "2026-10-15T11:35:51.726759+00:00",
+        "count": 4,
+        "unique_issues": 2,
+        "vulnerabilities": [
+          {
+            "id": "GHSA-65pc-fj4g-8rjx",
+            "aliases": [
+              "CVE-2026-45409",
+              "PYSEC-2026-215"
+            ],
+            "summary": "Internationalized Domain Names in Applications (IDNA): Specially crafted inputs to idna.encode() can bypass CVE-2024-3651 fix",
+            "published": "2026-05-19T14:34:32Z",
+            "fixed_in": [
+              "3.15"
+            ],
+            "url": "https://osv.dev/vulnerability/GHSA-65pc-fj4g-8rjx"
+          },
+          {
+            "id": "GHSA-jjg7-2v4v-x38h",
+            "aliases": [
+              "CVE-2024-3651",
+              "PYSEC-2024-60"
+            ],
+            "summary": "Internationalized Domain Names in Applications (IDNA) vulnerable to denial of service from specially crafted inputs to idna.encode",
+            "published": "2024-04-11T21:32:40Z",
+            "fixed_in": [
+              "3.7"
+            ],
+            "url": "https://osv.dev/vulnerability/GHSA-jjg7-2v4v-x38h"
+          },
+          {
+            "id": "PYSEC-2024-60",
+            "aliases": [
+              "CVE-2024-3651",
+              "GHSA-jjg7-2v4v-x38h"
+            ],
+            "summary": "A vulnerability was identified in the kjd/idna library, specifically within the `idna.encode()` function, affecting version 3.6. The issue arises from the function's handling of crafted input strings,",
+            "published": "2024-07-07T18:15:00Z",
+            "fixed_in": [
+              "3.7"
+            ],
+            "url": "https://osv.dev/vulnerability/PYSEC-2024-60"
+          },
+          {
+            "id": "PYSEC-2026-215",
+            "aliases": [
+              "CVE-2026-45409",
+              "GHSA-65pc-fj4g-8rjx"
+            ],
+            "summary": "Internationalized Domain Names in Applications (IDNA) for Python provides support for Internationalized Domain Names in Applications (IDNA) and Unicode IDNA Compatibility Processing. In versions prior",
+            "published": "2026-06-05T23:16:43.343Z",
+            "fixed_in": [
+              "3.15"
+            ],
+            "url": "https://osv.dev/vulnerability/PYSEC-2026-215"
+          }
+        ],
+        "note": "Informational; not part of the risk score.",
+        "candidate_resolution": {
+          "candidate_version": "3.20",
+          "resolved": [
+            "GHSA-65pc-fj4g-8rjx",
+            "GHSA-jjg7-2v4v-x38h",
+            "PYSEC-2024-60",
+            "PYSEC-2026-215"
+          ],
+          "not_resolved": [],
+          "note": "By comparing the candidate version with OSV 'fixed' versions; not a security test."
+        }
+      },
       "recommendation": {
         "evidence_type": "AI-RECOMMENDED",
+        "call_id": null,
         "status": "ok",
         "reason": null,
         "model": "gemma-4-26b-a4b-it",
@@ -2813,8 +2988,112 @@
           }
         ]
       },
+      "advisories": {
+        "status": "checked",
+        "evidence_type": "SOURCED",
+        "version": "2.31.0",
+        "source": "https://api.osv.dev/v1/querybatch",
+        "retrieved_at": "2026-10-15T11:35:51.726759+00:00",
+        "count": 6,
+        "unique_issues": 3,
+        "vulnerabilities": [
+          {
+            "id": "GHSA-9hjg-9r4m-mvj7",
+            "aliases": [
+              "CVE-2024-47081",
+              "PYSEC-2026-1872"
+            ],
+            "summary": "Requests vulnerable to .netrc credentials leak via malicious URLs",
+            "published": "2025-06-09T19:06:08Z",
+            "fixed_in": [
+              "2.32.4"
+            ],
+            "url": "https://osv.dev/vulnerability/GHSA-9hjg-9r4m-mvj7"
+          },
+          {
+            "id": "GHSA-9wx4-h78v-vm56",
+            "aliases": [
+              "CVE-2024-35195",
+              "PYSEC-2026-1873"
+            ],
+            "summary": "Requests `Session` object does not verify requests after making first request with verify=False",
+            "published": "2024-05-20T20:15:00Z",
+            "fixed_in": [
+              "2.32.0"
+            ],
+            "url": "https://osv.dev/vulnerability/GHSA-9wx4-h78v-vm56"
+          },
+          {
+            "id": "GHSA-gc5v-m9x4-r6x2",
+            "aliases": [
+              "CVE-2026-25645",
+              "PYSEC-2026-2275"
+            ],
+            "summary": "Requests has Insecure Temp File Reuse in its extract_zipped_paths() utility function",
+            "published": "2026-03-25T16:56:28Z",
+            "fixed_in": [
+              "2.33.0"
+            ],
+            "url": "https://osv.dev/vulnerability/GHSA-gc5v-m9x4-r6x2"
+          },
+          {
+            "id": "PYSEC-2026-1872",
+            "aliases": [
+              "CVE-2024-47081",
+              "GHSA-9hjg-9r4m-mvj7"
+            ],
+            "summary": "Requests vulnerable to .netrc credentials leak via malicious URLs",
+            "published": "2026-07-07T16:02:54.151964Z",
+            "fixed_in": [
+              "2.32.4"
+            ],
+            "url": "https://osv.dev/vulnerability/PYSEC-2026-1872"
+          },
+          {
+            "id": "PYSEC-2026-1873",
+            "aliases": [
+              "CVE-2024-35195",
+              "GHSA-9wx4-h78v-vm56"
+            ],
+            "summary": "Requests `Session` object does not verify requests after making first request with verify=False",
+            "published": "2026-07-07T11:45:42.890131Z",
+            "fixed_in": [
+              "2.32.0"
+            ],
+            "url": "https://osv.dev/vulnerability/PYSEC-2026-1873"
+          },
+          {
+            "id": "PYSEC-2026-2275",
+            "aliases": [
+              "CVE-2026-25645",
+              "GHSA-gc5v-m9x4-r6x2"
+            ],
+            "summary": "Requests is a HTTP library. Prior to version 2.33.0, the `requests.utils.extract_zipped_paths()` utility function uses a predictable filename when extracting files from zip archives into the system te",
+            "published": "2026-03-25T17:16:52.970Z",
+            "fixed_in": [
+              "2.33.0"
+            ],
+            "url": "https://osv.dev/vulnerability/PYSEC-2026-2275"
+          }
+        ],
+        "note": "Informational; not part of the risk score.",
+        "candidate_resolution": {
+          "candidate_version": "2.34.2",
+          "resolved": [
+            "GHSA-9hjg-9r4m-mvj7",
+            "GHSA-9wx4-h78v-vm56",
+            "GHSA-gc5v-m9x4-r6x2",
+            "PYSEC-2026-1872",
+            "PYSEC-2026-1873",
+            "PYSEC-2026-2275"
+          ],
+          "not_resolved": [],
+          "note": "By comparing the candidate version with OSV 'fixed' versions; not a security test."
+        }
+      },
       "recommendation": {
         "evidence_type": "AI-RECOMMENDED",
+        "call_id": null,
         "status": "ok",
         "reason": null,
         "model": "gemma-4-26b-a4b-it",
@@ -3581,8 +3860,25 @@
           }
         ]
       },
+      "advisories": {
+        "status": "checked",
+        "evidence_type": "SOURCED",
+        "version": "0.10.2",
+        "source": "https://api.osv.dev/v1/querybatch",
+        "retrieved_at": "2026-10-15T11:35:51.726759+00:00",
+        "count": 0,
+        "unique_issues": 0,
+        "vulnerabilities": [],
+        "note": "Informational; not part of the risk score.",
+        "candidate_resolution": {
+          "resolved": [],
+          "not_resolved": [],
+          "note": "The candidate removes this package's runtime declaration. Build-time requirements (e.g. [build-system] requires) are not changed by GhostLib."
+        }
+      },
       "recommendation": {
         "evidence_type": "AI-RECOMMENDED",
+        "call_id": null,
         "status": "ok",
         "reason": null,
         "model": "gemma-4-26b-a4b-it",
@@ -4297,8 +4593,26 @@
           }
         ]
       },
+      "advisories": {
+        "status": "checked",
+        "evidence_type": "SOURCED",
+        "version": "5.2.0",
+        "source": "https://api.osv.dev/v1/querybatch",
+        "retrieved_at": "2026-10-15T11:35:51.726759+00:00",
+        "count": 0,
+        "unique_issues": 0,
+        "vulnerabilities": [],
+        "note": "Informational; not part of the risk score.",
+        "candidate_resolution": {
+          "candidate_version": "7.6.0",
+          "resolved": [],
+          "not_resolved": [],
+          "note": "By comparing the candidate version with OSV 'fixed' versions; not a security test."
+        }
+      },
       "recommendation": {
         "evidence_type": "AI-RECOMMENDED",
+        "call_id": null,
         "status": "ok",
         "reason": null,
         "model": "gemma-4-26b-a4b-it",
@@ -4974,8 +5288,140 @@
           }
         ]
       },
+      "advisories": {
+        "status": "checked",
+        "evidence_type": "SOURCED",
+        "version": "2.11.3",
+        "source": "https://api.osv.dev/v1/querybatch",
+        "retrieved_at": "2026-10-15T11:35:51.726759+00:00",
+        "count": 8,
+        "unique_issues": 4,
+        "vulnerabilities": [
+          {
+            "id": "GHSA-cpwx-vrp4-4pq7",
+            "aliases": [
+              "CVE-2025-27516",
+              "PYSEC-2026-1471"
+            ],
+            "summary": "Jinja2 vulnerable to sandbox breakout through attr filter selecting format method",
+            "published": "2025-03-05T20:40:14Z",
+            "fixed_in": [
+              "3.1.6"
+            ],
+            "url": "https://osv.dev/vulnerability/GHSA-cpwx-vrp4-4pq7"
+          },
+          {
+            "id": "GHSA-h5c8-rqwp-cp95",
+            "aliases": [
+              "CVE-2024-22195",
+              "PYSEC-2026-1473"
+            ],
+            "summary": "Jinja vulnerable to HTML attribute injection when passing user input as keys to xmlattr filter",
+            "published": "2024-01-11T15:20:48Z",
+            "fixed_in": [
+              "3.1.3"
+            ],
+            "url": "https://osv.dev/vulnerability/GHSA-h5c8-rqwp-cp95"
+          },
+          {
+            "id": "GHSA-h75v-3vvj-5mfj",
+            "aliases": [
+              "CVE-2024-34064",
+              "PYSEC-2026-1474"
+            ],
+            "summary": "Jinja vulnerable to HTML attribute injection when passing user input as keys to xmlattr filter",
+            "published": "2024-05-06T14:20:59Z",
+            "fixed_in": [
+              "3.1.4"
+            ],
+            "url": "https://osv.dev/vulnerability/GHSA-h75v-3vvj-5mfj"
+          },
+          {
+            "id": "GHSA-q2x7-8rv6-6q7h",
+            "aliases": [
+              "CVE-2024-56326",
+              "PYSEC-2026-1475"
+            ],
+            "summary": "Jinja has a sandbox breakout through indirect reference to format method",
+            "published": "2024-12-23T17:56:08Z",
+            "fixed_in": [
+              "3.1.5"
+            ],
+            "url": "https://osv.dev/vulnerability/GHSA-q2x7-8rv6-6q7h"
+          },
+          {
+            "id": "PYSEC-2026-1471",
+            "aliases": [
+              "CVE-2025-27516",
+              "GHSA-cpwx-vrp4-4pq7"
+            ],
+            "summary": "Jinja2 vulnerable to sandbox breakout through attr filter selecting format method",
+            "published": "2026-07-07T14:34:50.446969Z",
+            "fixed_in": [
+              "3.1.6"
+            ],
+            "url": "https://osv.dev/vulnerability/PYSEC-2026-1471"
+          },
+          {
+            "id": "PYSEC-2026-1473",
+            "aliases": [
+              "CVE-2024-22195",
+              "GHSA-h5c8-rqwp-cp95"
+            ],
+            "summary": "Jinja vulnerable to HTML attribute injection when passing user input as keys to xmlattr filter",
+            "published": "2026-07-07T11:45:29.949639Z",
+            "fixed_in": [
+              "3.1.3"
+            ],
+            "url": "https://osv.dev/vulnerability/PYSEC-2026-1473"
+          },
+          {
+            "id": "PYSEC-2026-1474",
+            "aliases": [
+              "CVE-2024-34064",
+              "GHSA-h75v-3vvj-5mfj"
+            ],
+            "summary": "Jinja vulnerable to HTML attribute injection when passing user input as keys to xmlattr filter",
+            "published": "2026-07-07T11:45:41.875280Z",
+            "fixed_in": [
+              "3.1.4"
+            ],
+            "url": "https://osv.dev/vulnerability/PYSEC-2026-1474"
+          },
+          {
+            "id": "PYSEC-2026-1475",
+            "aliases": [
+              "CVE-2024-56326",
+              "GHSA-q2x7-8rv6-6q7h"
+            ],
+            "summary": "Jinja has a sandbox breakout through indirect reference to format method",
+            "published": "2026-07-07T14:34:47.732576Z",
+            "fixed_in": [
+              "3.1.5"
+            ],
+            "url": "https://osv.dev/vulnerability/PYSEC-2026-1475"
+          }
+        ],
+        "note": "Informational; not part of the risk score.",
+        "candidate_resolution": {
+          "candidate_version": "3.1.6",
+          "resolved": [
+            "GHSA-cpwx-vrp4-4pq7",
+            "GHSA-h5c8-rqwp-cp95",
+            "GHSA-h75v-3vvj-5mfj",
+            "GHSA-q2x7-8rv6-6q7h",
+            "PYSEC-2026-1471",
+            "PYSEC-2026-1473",
+            "PYSEC-2026-1474",
+            "PYSEC-2026-1475"
+          ],
+          "not_resolved": [],
+          "note": "By comparing the candidate version with OSV 'fixed' versions; not a security test."
+        }
+      },
       "recommendation": {
         "evidence_type": "AI-RECOMMENDED",
+        "call_id": null,
         "status": "ok",
         "reason": null,
         "model": "gemma-4-26b-a4b-it",
@@ -5543,8 +5989,26 @@
         "coverage_gap": false,
         "locations": []
       },
+      "advisories": {
+        "status": "checked",
+        "evidence_type": "SOURCED",
+        "version": "1.3.7",
+        "source": "https://api.osv.dev/v1/querybatch",
+        "retrieved_at": "2026-10-15T11:35:51.726759+00:00",
+        "count": 0,
+        "unique_issues": 0,
+        "vulnerabilities": [],
+        "note": "Informational; not part of the risk score.",
+        "candidate_resolution": {
+          "candidate_version": "9.1.1",
+          "resolved": [],
+          "not_resolved": [],
+          "note": "By comparing the candidate version with OSV 'fixed' versions; not a security test."
+        }
+      },
       "recommendation": {
         "evidence_type": "AI-RECOMMENDED",
+        "call_id": null,
         "status": "ok",
         "reason": null,
         "model": "gemma-4-26b-a4b-it",
@@ -6187,8 +6651,87 @@
           }
         ]
       },
+      "advisories": {
+        "status": "checked",
+        "evidence_type": "SOURCED",
+        "version": "75.8.0",
+        "source": "https://api.osv.dev/v1/querybatch",
+        "retrieved_at": "2026-10-15T11:35:51.726759+00:00",
+        "count": 4,
+        "unique_issues": 2,
+        "vulnerabilities": [
+          {
+            "id": "GHSA-5rjg-fvgr-3xxf",
+            "aliases": [
+              "BIT-setuptools-2025-47273",
+              "CVE-2025-47273",
+              "PYSEC-2025-49"
+            ],
+            "summary": "setuptools has a path traversal vulnerability in PackageIndex.download that leads to Arbitrary File Write",
+            "published": "2025-05-19T16:52:43Z",
+            "fixed_in": [
+              "78.1.1"
+            ],
+            "url": "https://osv.dev/vulnerability/GHSA-5rjg-fvgr-3xxf"
+          },
+          {
+            "id": "GHSA-h35f-9h28-mq5c",
+            "aliases": [
+              "BIT-setuptools-2026-59890",
+              "CVE-2026-59890",
+              "PYSEC-2026-3447"
+            ],
+            "summary": "setuptools: MANIFEST.in exclusion bypass in sdist via Unicode normalization collision (NFC/NFD) on macOS APFS/HFS+",
+            "published": "2026-07-21T19:09:21Z",
+            "fixed_in": [
+              "83.0.0"
+            ],
+            "url": "https://osv.dev/vulnerability/GHSA-h35f-9h28-mq5c"
+          },
+          {
+            "id": "PYSEC-2025-49",
+            "aliases": [
+              "BIT-setuptools-2025-47273",
+              "CVE-2025-47273",
+              "GHSA-5rjg-fvgr-3xxf"
+            ],
+            "summary": "setuptools is a package that allows users to download, build, install, upgrade, and uninstall Python packages. A path traversal vulnerability in `PackageIndex` is present in setuptools prior to versio",
+            "published": "2025-05-17T16:15:19Z",
+            "fixed_in": [
+              "78.1.1"
+            ],
+            "url": "https://osv.dev/vulnerability/PYSEC-2025-49"
+          },
+          {
+            "id": "PYSEC-2026-3447",
+            "aliases": [
+              "BIT-setuptools-2026-59890",
+              "CVE-2026-59890",
+              "GHSA-h35f-9h28-mq5c"
+            ],
+            "summary": "setuptools is a package that allows users to download, build, install, upgrade, and uninstall Python packages. Prior to 83.0.0, FileList applied MANIFEST.in exclude, global-exclude, recursive-exclude,",
+            "published": "2026-07-08T17:17:27.020Z",
+            "fixed_in": [
+              "83.0.0"
+            ],
+            "url": "https://osv.dev/vulnerability/PYSEC-2026-3447"
+          }
+        ],
+        "note": "Informational; not part of the risk score.",
+        "candidate_resolution": {
+          "resolved": [
+            "GHSA-5rjg-fvgr-3xxf",
+            "GHSA-h35f-9h28-mq5c",
+            "PYSEC-2025-49",
+            "PYSEC-2026-3447"
+          ],
+          "not_resolved": [],
+          "note": "The candidate removes this package's runtime declaration. Build-time requirements (e.g. [build-system] requires) are not changed by GhostLib."
+        }
+      },
       "recommendation": {
         "evidence_type": "AI-RECOMMENDED",
+        "call_id": null,
         "status": "ok",
         "reason": null,
         "model": "gemma-4-26b-a4b-it",
@@ -6859,8 +7402,19 @@
         "coverage_gap": false,
         "locations": []
       },
+      "advisories": {
+        "status": "not_checked",
+        "evidence_type": "UNKNOWN",
+        "reason": "No exact version is pinned, so advisories cannot be matched to a version.",
+        "candidate_resolution": {
+          "resolved": [],
+          "not_resolved": [],
+          "note": "The candidate removes this package's runtime declaration. Build-time requirements (e.g. [build-system] requires) are not changed by GhostLib."
+        }
+      },
       "recommendation": {
         "evidence_type": "AI-RECOMMENDED",
+        "call_id": null,
         "status": "ok",
         "reason": null,
         "model": "gemma-4-26b-a4b-it",
@@ -7440,8 +7994,14 @@
           }
         ]
       },
+      "advisories": {
+        "status": "not_checked",
+        "evidence_type": "UNKNOWN",
+        "reason": "No exact version is pinned, so advisories cannot be matched to a version."
+      },
       "recommendation": {
         "evidence_type": "AI-RECOMMENDED",
+        "call_id": null,
         "status": "ok",
         "reason": null,
         "model": "gemma-4-26b-a4b-it",
@@ -7656,8 +8216,14 @@
           }
         ]
       },
+      "advisories": {
+        "status": "not_checked",
+        "evidence_type": "UNKNOWN",
+        "reason": "No exact version is pinned, so advisories cannot be matched to a version."
+      },
       "recommendation": {
         "evidence_type": "AI-RECOMMENDED",
+        "call_id": null,
         "status": "ok",
         "reason": null,
         "model": "gemma-4-26b-a4b-it",
@@ -7884,8 +8450,14 @@
           }
         ]
       },
+      "advisories": {
+        "status": "not_checked",
+        "evidence_type": "UNKNOWN",
+        "reason": "No exact version is pinned, so advisories cannot be matched to a version."
+      },
       "recommendation": {
         "evidence_type": "AI-RECOMMENDED",
+        "call_id": null,
         "status": "ok",
         "reason": null,
         "model": "gemma-4-26b-a4b-it",
@@ -8173,8 +8745,14 @@
           }
         ]
       },
+      "advisories": {
+        "status": "not_checked",
+        "evidence_type": "UNKNOWN",
+        "reason": "No exact version is pinned, so advisories cannot be matched to a version."
+      },
       "recommendation": {
         "evidence_type": "AI-RECOMMENDED",
+        "call_id": null,
         "status": "ok",
         "reason": null,
         "model": "gemma-4-26b-a4b-it",
