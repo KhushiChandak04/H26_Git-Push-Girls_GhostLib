@@ -1,0 +1,38 @@
+{
+  "_sample": true,
+  "generated_at": "2026-10-15T09:00:00Z",
+  "repository": { "name": "LinkWatch", "path": "./LinkWatch", "commit": "Not available", "dependencies_scanned": 2 },
+  "environment": { "python": "3.12.6", "os": "Not available", "model": "Gemma 4 (access method: confirm with organizers)" },
+  "dependencies": [
+    {
+      "dependency": { "name": "example-http", "declared_version": "==1.2.0", "manifest": "requirements.txt" },
+      "risk_indicators": [
+        { "label": "Latest release", "detail": "Sample value: 31 months ago", "claim": ["SOURCED"], "source": "PyPI JSON API" },
+        { "label": "Python 3.13 support", "detail": "Not declared in classifiers", "claim": ["SOURCED"], "source": "PyPI JSON API" },
+        { "label": "Used in 2 files", "detail": "Found by AST import scan", "claim": ["VERIFIED"], "source": "ast" }
+      ],
+      "usage_locations": [
+        { "file": "app/fetcher.py", "line": 4, "symbol": "example_http.get", "snippet": "resp = example_http.get(url, timeout=5)", "claim": ["VERIFIED"] },
+        { "file": "app/checker.py", "line": 18, "symbol": "example_http.Session", "snippet": "s = example_http.Session()", "claim": ["VERIFIED"] }
+      ],
+      "replacement_candidates": [
+        { "name": "candidate-a", "claim": ["SUGGESTED"], "exists_on_pypi": { "value": "Not checked", "claim": ["UNKNOWN"] }, "python_support": { "value": "Not available", "claim": ["UNKNOWN"] }, "effort": "Low", "pros": ["Similar get/Session shape"], "cons": ["Timeout semantics may differ"] },
+        { "name": "candidate-b", "claim": ["SUGGESTED"], "exists_on_pypi": { "value": "Not checked", "claim": ["UNKNOWN"] }, "python_support": { "value": "Not available", "claim": ["UNKNOWN"] }, "effort": "Medium", "pros": ["Async support"], "cons": ["Requires call-site rewrite"] }
+      ],
+      "migration": { "status": "awaiting_approval", "selected": "candidate-a", "diff": "--- a/requirements.txt\n+++ b/requirements.txt\n-example-http==1.2.0\n+candidate-a\n--- a/app/fetcher.py\n+++ b/app/fetcher.py\n-resp = example_http.get(url, timeout=5)\n+resp = candidate_a.get(url, timeout=5)", "claim": ["SUGGESTED"] },
+      "test_results": { "baseline": { "status": "not_run", "command": "Not available", "exit_code": null }, "candidate": { "status": "not_run", "command": "Not available", "exit_code": null } },
+      "behavioral_comparison": { "checked": [], "untested": ["Redirect handling", "Timeout exceptions"] },
+      "limitations": ["Replacement compatibility has not been verified.", "Static analysis cannot see dynamically built imports."]
+    },
+    {
+      "dependency": { "name": "example-parser", "declared_version": ">=0.9", "manifest": "pyproject.toml" },
+      "risk_indicators": [{ "label": "Maintenance signal", "detail": "Not available", "claim": ["UNKNOWN"], "source": "Not available" }],
+      "usage_locations": [],
+      "replacement_candidates": [],
+      "migration": { "status": "not_started", "selected": null, "diff": null },
+      "test_results": { "baseline": { "status": "not_run" }, "candidate": { "status": "not_run" } },
+      "behavioral_comparison": { "checked": [], "untested": [] },
+      "limitations": ["No usage found. This does not prove the package is unused."]
+    }
+  ]
+}

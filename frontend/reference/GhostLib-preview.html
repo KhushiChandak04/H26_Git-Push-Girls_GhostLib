@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GhostLib</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shrikhand&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--blood:#d9381e;--bone:#f2e7d0;--plum:#1b0f17;--plum2:#27161f;--mustard:#e8a33d;--line:#4a2e3b;--mute:#a8967f;--display:"Shrikhand",Georgia,serif;--body:"Bricolage Grotesque",system-ui,sans-serif;--mono:"DM Mono",ui-monospace,monospace;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plum);color:var(--bone);font-family:var(--body);line-height:1.55}
+code,pre{font-family:var(--mono);font-size:.84rem}
+h2{font-family:var(--display);font-weight:400;font-size:2rem;margin:.2rem 0 1rem}
+h3{font-weight:600;font-size:1.05rem;margin:2rem 0 .6rem;display:flex;gap:.7rem;align-items:center}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--mustard);outline-offset:2px}
+.muted{color:var(--mute)}
+.nav{display:flex;align-items:center;gap:2rem;padding:.9rem 2.5rem;background:var(--blood);color:var(--plum);flex-wrap:wrap}
+.mark{font-family:var(--display);font-size:1.6rem}
+.nav nav{display:flex;gap:1.4rem;flex:1;justify-content:center;flex-wrap:wrap}
+.nav nav button{background:none;border:0;border-bottom:2px solid transparent;padding:.2rem 0;color:var(--plum);font-size:.95rem}
+.nav nav button.on{border-color:var(--plum);font-weight:600}
+.nav .tag{font-size:.8rem;opacity:.75}
+.banner{background:var(--mustard);color:var(--plum);padding:.5rem 2.5rem;font-size:.9rem}
+main{max-width:1180px;margin:0 auto;padding:2rem 2.5rem 5rem}
+.empty{color:var(--mute);border-left:3px solid var(--line);padding-left:1rem}
+.hero{position:relative;background:var(--blood);margin:-2rem -2.5rem 2rem;padding:2.5rem 2.5rem 0;height:560px;overflow:hidden}
+.hero h1{position:absolute;inset:0;margin:0;font-family:var(--display);font-weight:400;font-size:clamp(5rem,16vw,13rem);line-height:.8;color:var(--bone);text-shadow:8px 8px 0 var(--plum);filter:url(#melt);display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;z-index:1}
+.hero h1 span:nth-child(2){transform:translateX(-5%)}.hero h1 span:nth-child(3){transform:translateX(8%)}
+.cl,.cr{position:absolute;z-index:3;color:var(--plum)}
+.cl{left:2.5rem;top:42%;font-family:var(--mono);font-size:.76rem}
+.cr{right:2.5rem;bottom:2.2rem;width:230px;font-size:.9rem}
+.burst{position:absolute;right:15%;top:6%;width:180px;transform:rotate(12deg);animation:spin 40s linear infinite}
+@keyframes spin{to{transform:rotate(372deg)}}
+.ghost{position:absolute;left:40%;bottom:-4px;width:210px;z-index:2;animation:float 4s ease-in-out infinite}
+@keyframes float{50%{transform:translateY(-10px)}}
+.btn-bone,.btn-line{padding:.55rem 1.3rem;border-radius:999px;font-weight:600;border:2px solid var(--bone);display:inline-block}
+.btn-bone{background:var(--bone);color:var(--plum)}.btn-line{background:none}
+.hero .btn-bone{background:var(--plum);color:var(--bone);border-color:var(--plum);margin-top:.8rem}
+.btn-bone:hover:not(:disabled){background:var(--mustard);border-color:var(--mustard);color:var(--plum)}
+button:disabled{opacity:.35;cursor:not-allowed}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);border:2px solid var(--bone);margin-bottom:2.5rem}
+.stats div{padding:1.1rem 1.4rem;border-right:2px solid var(--bone);display:flex;flex-direction:column}.stats div:last-child{border:0}
+.stats b{font-family:var(--display);font-weight:400;font-size:2.4rem;line-height:1.1}.stats span{color:var(--mute);font-size:.9rem}
+.row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:.9rem .4rem}
+.row:hover{background:var(--plum2)}
+.split{display:grid;grid-template-columns:230px 1fr;gap:2.5rem}
+.list{display:flex;flex-direction:column;gap:.4rem}
+.item{display:flex;flex-direction:column;text-align:left;background:none;border:1px solid var(--line);padding:.7rem .9rem}
+.item small{color:var(--mute)}.item.on{background:var(--bone);color:var(--plum);border-color:var(--bone)}.item.on small{color:var(--plum)}
+.ev{display:flex;justify-content:space-between;gap:1rem;border-top:1px solid var(--line);padding:.7rem 0}.ev p{margin:.1rem 0}
+.usage{border:1px solid var(--line);margin-bottom:.8rem;background:var(--plum2)}
+.usage-h{display:flex;gap:.8rem;align-items:center;padding:.5rem .8rem;border-bottom:1px solid var(--line)}.usage-h a{margin-left:auto;color:var(--mustard)}
+pre{margin:0;padding:.8rem 1rem;overflow-x:auto;background:var(--plum2);border:1px solid var(--line)}.usage pre{border:0}
+.chip{font-family:var(--mono);font-size:.68rem;padding:.12rem .5rem;border-radius:999px;border:1.5px solid;white-space:nowrap}
+.c-verified{background:var(--bone);color:var(--plum);border-color:var(--bone)}.c-sourced{background:var(--mustard);color:var(--plum);border-color:var(--mustard)}
+.c-suggested{color:var(--blood);border-color:var(--blood)}.c-unknown{color:var(--mute);border-color:var(--mute);border-style:dashed}
+.state{font-family:var(--mono);font-size:.78rem;border:1.5px solid var(--mustard);color:var(--mustard);padding:.15rem .7rem;border-radius:999px}
+.cands{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem}
+.cand{border:1px solid var(--line);padding:1rem;background:var(--plum2);display:flex;flex-direction:column;gap:.5rem}
+.cand.picked{border-color:var(--blood);box-shadow:6px 6px 0 var(--blood)}.cand header{display:flex;justify-content:space-between}
+dl{display:grid;grid-template-columns:auto 1fr;gap:.3rem 1rem;margin:0}dt{color:var(--mute)}dd{margin:0}
+.cand p{margin:0;font-size:.9rem}.pro::before{content:"+ ";color:var(--mustard)}.con::before{content:"− ";color:var(--blood)}
+.add{color:var(--mustard)}.del{color:var(--blood)}
+.actions{display:flex;gap:.8rem;margin:1.4rem 0 .8rem;flex-wrap:wrap}
+.runs{display:grid;grid-template-columns:1fr 1fr;gap:1rem}.run{border:1px solid var(--line);padding:1rem;background:var(--plum2)}.run h3{margin-top:0}
+.note{border-left:3px solid var(--blood);padding-left:1rem}
+.kv{grid-template-columns:140px 1fr;margin-bottom:1.5rem}
+@media(max-width:900px){.hero{height:420px}.cl,.cr,.burst{display:none}.ghost{left:55%;width:140px}.split,.runs,.stats{grid-template-columns:1fr}.nav,main{padding-left:1rem;padding-right:1rem}.hero{margin:-2rem -1rem 2rem}.banner{padding:.5rem 1rem}}
+@media(prefers-reduced-motion:reduce){.burst,.ghost{animation:none}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="melt"><feTurbulence type="fractalNoise" baseFrequency="0.010 0.018" numOctaves="2" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="34" xChannelSelector="R" yChannelSelector="G"/></filter></svg>
+<header class="nav"><strong class="mark">GhostLib</strong><nav id="tabs"></nav><span class="tag">sample data</span></header>
+<div class="banner">Design preview with sample data, not a real LinkWatch finding. The real app reads the backend's capsule.</div>
+<main id="view"></main>
+<script>
+const D=[{n:"example-http",v:"==1.2.0",m:"requirements.txt",
+risk:[["Latest release","Sample value: 31 months ago",["SOURCED"],"PyPI JSON API"],["Python 3.13 support","Not declared in classifiers",["SOURCED"],"PyPI JSON API"],["Used in 2 files","Found by AST import scan",["VERIFIED"],"ast"]],
+use:[["app/fetcher.py",4,"resp = example_http.get(url, timeout=5)"],["app/checker.py",18,"s = example_http.Session()"]],
+cand:[{n:"candidate-a",py:"Not available",e:"Low",pro:"Similar get/Session shape",con:"Timeout semantics may differ"},{n:"candidate-b",py:"Not available",e:"Medium",pro:"Async support",con:"Requires call-site rewrite"}],
+diff:"--- a/requirements.txt\n+++ b/requirements.txt\n-example-http==1.2.0\n+candidate-a\n--- a/app/fetcher.py\n+++ b/app/fetcher.py\n-resp = example_http.get(url, timeout=5)\n+resp = candidate_a.get(url, timeout=5)",
+untested:["Redirect handling","Timeout exceptions"],lim:["Replacement compatibility has not been verified.","Static analysis cannot see dynamically built imports."]},
+{n:"example-parser",v:">=0.9",m:"pyproject.toml",risk:[["Maintenance signal","Not available",["UNKNOWN"],"Not available"]],use:[],cand:[],diff:"",untested:[],lim:["No usage found. This does not prove the package is unused."]}];
+let tab="Overview",i=0,picked="candidate-a",msg="";
+const T=["Overview","Dependencies","Migration","Verification","Capsule"];
+const chip=c=>c.map(x=>`<span class="chip c-${x.toLowerCase()}">${x}</span>`).join(" ");
+const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const burst=()=>{let p="";for(let k=0;k<24;k++){const a=k/24*6.283,r=k%2?34:98;p+=(100+r*Math.cos(a)).toFixed(1)+","+(100+r*Math.sin(a)).toFixed(1)+" "}return `<svg class="burst" viewBox="0 0 200 200"><polygon points="${p}" fill="#140b10"/><circle cx="100" cy="100" r="17" fill="#d9381e"/><circle cx="100" cy="100" r="7" fill="#140b10"/></svg>`};
+const ghost=`<svg class="ghost" viewBox="0 0 200 260"><ellipse cx="150" cy="248" rx="120" ry="9" fill="#140b10" opacity=".55" transform="skewX(-40) translate(95 0)"/><path d="M30 120C30 56 66 18 100 18s70 38 70 102v120l-23-18-24 18-23-18-23 18-24-18-23 18z" fill="#140b10"/><ellipse cx="78" cy="104" rx="11" ry="15" fill="#f2e7d0"/><ellipse cx="122" cy="104" rx="11" ry="15" fill="#f2e7d0"/><ellipse cx="100" cy="150" rx="9" ry="13" fill="#f2e7d0"/></svg>`;
+const V={
+Overview:()=>`<section class="hero"><div class="cl">DEPENDENCIES THAT<br>HAUNT YOUR REPO.<br>EVIDENCE FOR EVERY<br>CLAIM WE MAKE.</div>${burst()}<h1><span>The</span><span>Ghost</span><span>Lib</span></h1>${ghost}<div class="cr">Scan a Python project, map where each package lives, test a replacement in a sandbox, and keep the receipts.<br><button class="btn-bone" data-go="Dependencies">Open findings</button></div></section>
+<section class="stats"><div><b>${D.length}</b><span>dependencies scanned</span></div><div><b>${D.length}</b><span>need review</span></div><div><b>0</b><span>migrations tested</span></div><div><b>LinkWatch</b><span>Python 3.12.6</span></div></section>
+<h2>Haunted packages</h2>${D.map((d,k)=>`<button class="row" data-go="Dependencies" data-i="${k}"><code>${d.n}</code><span class="muted">${d.v}</span><span class="muted">${d.use.length} usages</span><span class="muted">${d.risk.length} signals</span></button>`).join("")}`,
+Dependencies:()=>{const d=D[i];return `<div class="split"><aside class="list">${D.map((x,k)=>`<button class="item ${k==i?"on":""}" data-i="${k}"><code>${x.n}</code><small>${x.v}</small></button>`).join("")}</aside><div><h2>${d.n} <small class="muted" style="font:400 .9rem var(--mono)">${d.m}</small></h2><h3>Why it was flagged</h3>${d.risk.map(r=>`<div class="ev"><div><strong>${r[0]}</strong><p>${r[1]}</p><small class="muted">Source: ${r[3]}</small></div><div>${chip(r[2])}</div></div>`).join("")}<h3>Where it is used</h3>${d.use.length?d.use.map(u=>`<div class="usage"><div class="usage-h"><code>${u[0]}:${u[1]}</code>${chip(["VERIFIED"])}<a href="vscode://file/${u[0]}:${u[1]}">Open in VS Code</a></div><pre>${esc(u[2])}</pre></div>`).join(""):`<p class="empty">No usages detected. Static analysis cannot rule out dynamic imports.</p>`}<h3>Limits of this analysis</h3><ul>${d.lim.map(l=>`<li>${l}</li>`).join("")}</ul></div></div>`},
+Migration:()=>{const d=D[i];return `<h2>Migration workbench</h2><p><label>Dependency <select id="sel" style="background:var(--plum2);color:var(--bone);border:1px solid var(--line);padding:.4rem;font:inherit">${D.map((x,k)=>`<option value="${k}" ${k==i?"selected":""}>${x.n}</option>`).join("")}</select></label> <span class="state">awaiting approval</span></p><h3>Replacement tournament</h3>${d.cand.length?`<div class="cands">${d.cand.map(c=>`<article class="cand ${picked==c.n?"picked":""}"><header><code>${c.n}</code>${chip(["SUGGESTED"])}</header><dl><dt>Exists on PyPI</dt><dd>Not checked ${chip(["UNKNOWN"])}</dd><dt>Python 3.12 / 3.13</dt><dd>${c.py} ${chip(["UNKNOWN"])}</dd><dt>Migration effort</dt><dd>${c.e}</dd></dl><p class="pro">${c.pro}</p><p class="con">${c.con}</p><button class="btn-line" data-pick="${c.n}">Test this one</button></article>`).join("")}</div>`:`<p class="empty">No candidates yet.</p>`}${d.diff?`<h3>Proposed diff ${chip(["SUGGESTED"])}</h3><pre>${d.diff.split("\n").map(l=>`<span class="${l[0]=="+"?"add":l[0]=="-"?"del":""}">${esc(l)}\n</span>`).join("")}</pre><div class="actions"><button class="btn-bone" data-act="Approved for the sandbox copy. In the real app the backend runs the tests next.">Approve in sandbox</button><button class="btn-line" data-act="Rejected. Nothing was changed.">Reject</button><button class="btn-line" data-act="Candidate discarded.">Discard candidate</button></div><p class="muted">${msg||"Approved changes touch the sandbox copy only. Your repository is never modified."}</p>`:""}`},
+Verification:()=>{const d=D[i];const r=t=>`<div class="run"><h3>${t}</h3><span class="state">not run</span><p><span class="muted">Command</span><br><code>Not available</code></p><p><span class="muted">Exit code</span><br><code>Not available</code></p></div>`;return `<h2>${d.n}</h2><div class="runs">${r("Original baseline")}${r("Candidate")}</div><h3>Behavioural comparison</h3><p class="note">Passing tests do not prove the two packages behave the same.</p><div class="runs"><div class="run"><h3>Checked</h3><p class="empty">Nothing compared yet.</p></div><div class="run"><h3>Not tested</h3>${d.untested.length?`<ul>${d.untested.map(u=>`<li>${u}</li>`).join("")}</ul>`:`<p class="empty">Not available</p>`}</div></div>`},
+Capsule:()=>`<h2>Exit Capsule</h2><dl class="kv"><dt>Repository</dt><dd>LinkWatch</dd><dt>Commit</dt><dd><code>Not available</code></dd><dt>Python</dt><dd>3.12.6</dd><dt>AI model</dt><dd>Gemma 4</dd><dt>Generated</dt><dd>2026-10-15</dd></dl><div class="actions"><button class="btn-bone" data-act="In the real app this downloads capsule.json.">Export capsule.json</button><button class="btn-line" data-act="In the real app this downloads capsule.md.">Export capsule.md</button></div><p class="muted">${msg}</p><h3>Reproduce</h3><pre>ghostwatch scan ./LinkWatch</pre>`};
+function draw(){document.getElementById("tabs").innerHTML=T.map(t=>`<button class="${t==tab?"on":""}" data-go="${t}">${t}</button>`).join("");document.getElementById("view").innerHTML=V[tab]();}
+document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+if(b.dataset.go){tab=b.dataset.go;if(b.dataset.i)i=+b.dataset.i;msg="";window.scrollTo(0,0)}
+else if(b.dataset.i)i=+b.dataset.i;
+else if(b.dataset.pick)picked=b.dataset.pick;
+else if(b.dataset.act)msg=b.dataset.act;
+draw()});
+document.addEventListener("change",e=>{if(e.target.id=="sel"){i=+e.target.value;draw()}});
+draw();
+</script>
+</body>
+</html>
