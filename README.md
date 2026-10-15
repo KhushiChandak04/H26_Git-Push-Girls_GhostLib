@@ -92,30 +92,6 @@ overhead per action is now well under a second; see "Performance" below.
 | Experiment (TensorFlow, first time) | ~7 min | Downloading ~600 MB of wheels; cached afterwards |
 | Opening a run in the dashboard | ~0.2–0.3 s | — (was ~3 s before caching) |
 
-## Known vulnerabilities (separate from the risk score)
-
-For every **exactly pinned** dependency, GhostLib queries [OSV.dev](https://osv.dev). The results are labelled
-SOURCED, linked to each advisory, and deduplicated across aliases (one CVE can have both a GHSA and a PYSEC ID). They
-are **never added to the risk score**: outdated is not the same as vulnerable. Ranges such as `>=2` are reported as
-"not checked" rather than guessed, and an unreachable OSV is reported as "unavailable". For each tested candidate,
-the capsule shows which advisories its version is past the fix for (a version comparison, not a security test).
-`ghostlib advisories <run-id>` re-runs the lookup for an existing run.
-
-On LinkWatch: `Jinja2==2.11.3` has 4 unique issues, `requests==2.31.0` 3, `idna==2.7` 2 and `setuptools==75.8.0` 2. The
-tested candidates are past the fix for all of their advisory IDs.
-
-## Evidence labels
-
-Every statement in the dashboard and the capsule carries one of these labels:
-
-| Label | Meaning |
-|---|---|
-| **OBSERVED** | Read directly from repository files (manifests, Python AST) or git metadata |
-| **SOURCED** | Retrieved from PyPI's JSON API. The URL and retrieval time are recorded |
-| **EXECUTION-VERIFIED** | Produced by a command GhostLib actually ran. The argv, exit code and full log are recorded |
-| **AI-RECOMMENDED** | Suggested by Gemma 4. Schema-validated, but not established as true |
-| **UNKNOWN** | Could not be established, or not tested |
-
 ## What it does
 
 1. **Scan (OBSERVED):** finds `requirements*.txt` and `pyproject.toml` recursively, skipping venvs and build dirs. It records:
@@ -146,30 +122,6 @@ Every statement in the dashboard and the capsule carries one of these labels:
    - compatibility gaps, open concerns and limitations;
    - reproduction and rollback instructions.
 
-### Historical LinkWatch result (`f52f393`, Python 3.12.14)
-
-These results are preserved from an earlier run. The current checkout will not reproduce them because safe test
-execution is blocked until a sandbox runner is available.
-
-| | Tests | Notes |
-|---|---|---|
-| Baseline (`Jinja2==2.11.3`) | 9 passed, 1 failed | `test_report` fails because `jinja2` imports `soft_unicode`, which `markupsafe` 3.x removed |
-| Candidate (`Jinja2==3.1.6`) | 10 passed | 1 fixed, 0 regressions; original repository verified unchanged |
-| Candidate `toml` → stdlib `tomllib` (Gemma 4 code edit, reviewed diff) | 9 passed, 1 failed | 0 regressions; only the pre-existing Jinja2 failure remains; `toml` no longer installed |
-
-Two caveats GhostLib recorded for the tomllib experiment:
-- Gemma's proposed regression test had a bug (a missing `import tempfile`), so it failed to collect. It ran in a
-  separate pass, so it could not hide the migration's real result.
-- The project still allows Python 3.10 (`requires-python >=3.10`), but the stdlib replacement was only verified on
-  the versions tested here.
-
-Other findings from the same scan:
-- `certifi` is imported but not declared.
-- `pydantic` is declared `==1.10.13` in `requirements.txt` but `>=2` in `pyproject.toml`.
-- `requests` private API `_parse_content_type_header` is used, and `requests.Session.request` is monkey-patched.
-- `toml` and `appdirs` have had no release since 2020.
-- `idna` and `six` are declared but never imported.
-- `nose==1.3.7` crashes on Python 3.12 (`No module named 'imp'`).
 
 ## Requirements
 
@@ -200,19 +152,6 @@ cp backend/.env.example backend/.env    # git-ignored; put your key here, never 
 ghostlib ai-check                       # verifies the model is reachable and records its resource name
 ```
 
-- **Model:** `gemma-4-26b-a4b-it` by default, configurable with `GEMMA_MODEL`. The exact `modelVersion` returned by the
-  API is stored with every response.
-- **Access method:** Google AI Studio API key, hosted inference.
-- **Terms:** Gemma is provided under the [Gemma Terms of Use](https://ai.google.dev/gemma/terms). Use of the API is
-  also subject to the Gemini API terms.
-- **What is sent:** collected evidence (declarations, PyPI facts, risk indicators and source context). For
-  code-change proposals, affected source files are sent after common credential/token patterns are redacted.
-- **Generation settings:** requests use JSON output mode and `thinkingConfig.thinkingLevel = "minimal"`
-  (`GEMMA_THINKING_LEVEL`). Without it, Gemma 4's hidden reasoning was observed to use the entire output budget:
-  8,189 thought tokens, no answer, then HTTP 500s. With it, recommendations return in about 12–22 s.
-- **AI-written tests:** are proposals only; repository tests do not run before an appropriate sandbox exists.
-- **Fallback:** without a key, AI reports `AI_UNAVAILABLE`. Scanning, metadata, rule scoring, proposals and capsule
-  generation continue to work.
 
 ## CLI
 
@@ -272,27 +211,6 @@ The dashboard has five pages:
 5. **Exit Capsule:** the rendered report with JSON and Markdown downloads.
 
 Set `VITE_API_BASE` if the API is not on `http://127.0.0.1:8000/api`.
-
-## Safety and isolation (what is and is not provided)
-
-- Scans read files only. GhostLib never writes to the target repository.
-- Proposed patches are stored under run artifacts and must be applied by the user.
-- Test execution is blocked until an OS/container sandbox runner exists; human approval does not grant permission
-  to execute repository code on the host.
-- GitHub clone subprocesses use argument lists, disable credential prompts, and enforce timeouts.
-- Nothing is merged automatically. To adopt a candidate, review `experiments/<pkg>/proposal.diff` and apply it yourself.
-- Model output never becomes a shell command.
-
-## Known limitations
-
-- Parsed manifests: `requirements*.txt` and `pyproject.toml` (PEP 621, PEP 735 groups, Poetry).
-  `setup.py`/`setup.cfg`/lockfiles are listed but not parsed.
-- Static analysis misses dynamic imports. The import-to-distribution mapping uses a small curated table, and
-  heuristic matches are labelled as such.
-- Test relevance comes from the import graph, not line coverage.
-- Passing tests show no regressions in the behaviour those tests exercise. They do not prove equivalence.
-- OSV matching requires an exact pin; ranges and unpinned dependencies have no version-specific result.
-- Migration regression verification is unavailable in the current environment because the sandbox runner is absent.
 
 ## License
 
