@@ -3,9 +3,12 @@ import { api } from "./services/api.js";
 
 const na = (v) => (v === undefined || v === null || v === "" ? "Not available" : v);
 const TABS = ["Overview", "Dependencies", "Migration", "Verification", "Capsule"];
-const CHIP_CLASS = {
-  OBSERVED: "observed", SOURCED: "sourced", "EXECUTION-VERIFIED": "verified",
-  "AI-RECOMMENDED": "suggested", UNKNOWN: "unknown",
+const EVIDENCE = {
+  OBSERVED: ["observed", "Observed", "Read directly from the repository: manifests, source code (AST) or git."],
+  SOURCED: ["sourced", "Sourced", "Fetched from PyPI's JSON API; the URL and time are recorded."],
+  "EXECUTION-VERIFIED": ["verified", "Verified", "Produced by a command GhostLib actually ran (exit code and log recorded)."],
+  "AI-RECOMMENDED": ["ai", "AI", "Suggested by Gemma 4. Checked for shape, not proven correct."],
+  UNKNOWN: ["unknown", "Unknown", "Could not be established, or not tested."],
 };
 const storage = {
   get: (k) => { try { return window.localStorage.getItem(k); } catch { return null; } },
@@ -14,9 +17,10 @@ const storage = {
 
 const Chip = ({ claim }) => (
   <span className="chips">
-    {(Array.isArray(claim) ? claim : [claim || "UNKNOWN"]).map((c) => (
-      <span key={c} className={`chip chip-${CHIP_CLASS[c] || "unknown"}`} title={c}>{c}</span>
-    ))}
+    {(Array.isArray(claim) ? claim : [claim || "UNKNOWN"]).map((c) => {
+      const [cls, label, tip] = EVIDENCE[c] || EVIDENCE.UNKNOWN;
+      return <span key={c} className={`chip chip-${cls}`} title={`${c}: ${tip}`}>{label}</span>;
+    })}
   </span>
 );
 
@@ -132,6 +136,7 @@ function Overview({ run, runs, openRun, scan, go }) {
             </button>
           ))}
         </section>
+        <ScoreSources />
         <section className="panel">
           <h2>Repository findings</h2>
           {run.undeclared_imports.map((u) => <div className="ev" key={u.import_name}><div><strong>Undeclared import <code>{u.import_name}</code></strong>
@@ -145,6 +150,26 @@ function Overview({ run, runs, openRun, scan, go }) {
         </section>
       </>}
     </>
+  );
+}
+
+function ScoreSources() {
+  const [rubric, setRubric] = useState(null);
+  useEffect(() => { api.rubric().then(setRubric).catch(() => {}); }, []);
+  if (!rubric) return null;
+  return (
+    <section className="panel">
+      <details className="more" open>
+        <summary><h2 className="inline">Where do these risk scores come from?</h2></summary>
+        <p><strong>Not from AI.</strong> {rubric.computed_by} Each package's score is the sum of the rules below that fired for it.
+          Bands: high ≥ {rubric.bands.high}, medium ≥ {rubric.bands.medium}, low ≥ {rubric.bands.low}. Gemma 4 is only used later, to suggest replacements.</p>
+        <table className="cmp">
+          <thead><tr><th>Rule</th><th>Points</th><th>Data from</th><th>Meaning</th></tr></thead>
+          <tbody>{rubric.rules.map((r) => <tr key={r.indicator}><td><code>{r.indicator.replaceAll("_", " ")}</code></td><td>+{r.points}</td>
+            <td><Chip claim={r.evidence_type} /> {r.source}</td><td>{r.description}</td></tr>)}</tbody>
+        </table>
+      </details>
+    </section>
   );
 }
 
@@ -199,7 +224,7 @@ function Dependencies({ run, selected, select }) {
             <Chip claim={r.evidence_type} />
           </div>
         ))}
-        <p className="muted small">{p.assessment.disclaimer}</p>
+        <p className="muted small">Scored by fixed rules (see Overview → "Where do these risk scores come from?"), not by AI. {p.assessment.disclaimer}</p>
 
         <h3>Where it is used <Chip claim="OBSERVED" /> <small className="muted">import mapping: {p.mapping_confidence}</small></h3>
         {p.locations.length === 0 && <p className="empty">No static import of {p.import_names.join(", ")} found. It may be unused, or used dynamically.</p>}
@@ -232,6 +257,18 @@ function Dependencies({ run, selected, select }) {
 }
 
 /* ---------------------------------------------------------------- Migration */
+
+const STEPS = ["Choose", "Review", "Test", "Adopt"];
+
+function Steps({ current }) {
+  return (
+    <ol className="steps">
+      {STEPS.map((s, i) => (
+        <li key={s} className={i < current ? "done" : i === current ? "now" : ""}><b>{i + 1}</b>{s}</li>
+      ))}
+    </ol>
+  );
+}
 
 function Migration({ run, health, selected, select, refresh, go, setWarn }) {
   const pkgs = run.packages;
@@ -268,124 +305,147 @@ function Migration({ run, health, selected, select, refresh, go, setWarn }) {
   const propose = (candidate, kind) => act("propose", async () => {
     setExp(await api.propose(run.run_id, name, { candidate, kind })); setConfirm(false);
   });
-  const approve = () => act("approve", async () => setExp(await api.approve(run.run_id, name, { confirm: true, python, approved_by: "dashboard user" })));
-  const reject = () => act("reject", async () => { setExp(await api.reject(run.run_id, name, "Rejected in dashboard")); await refresh(); });
+  const runTests = () => act("approve", async () => setExp(await api.approve(run.run_id, name, { confirm: true, python, approved_by: "dashboard user" })));
+  const drop = (reason) => act("reject", async () => { setExp(await api.reject(run.run_id, name, reason)); await refresh(); });
 
   const validation = (pkgName) => (rec?.candidate_validation || []).find((v) => v.package === pkgName);
-  const check = (v, key) => v?.checks.find((c) => c.check === key);
   const cards = ok ? rec.recommendation.candidates.map((c) => ({ ...c, v: validation(c.package), ai: true })) : [];
   if (!cards.some((c) => c.kind === "upgrade" && c.package === name))
-    cards.push({ package: name, kind: "upgrade", rationale: `Pin ${name} to its latest PyPI release (deterministic, no AI).`, pros: [], cons: [], ai: false });
+    cards.push({ package: name, kind: "upgrade", rationale: `Keep ${name}, but move to its newest release.`, pros: [], cons: [], ai: false });
   if (p.usage.status === "not_observed_static" && !cards.some((c) => c.kind === "remove"))
-    cards.push({ package: name, kind: "remove", rationale: "No static import was observed; remove the declaration.", pros: [], cons: [], ai: false });
-  const picked = exp && exp.state !== "rejected" ? exp.candidate : null;
+    cards.push({ package: name, kind: "remove", rationale: "Nothing imports it, so try deleting it.", pros: [], cons: [], ai: false });
+
+  const live = exp && exp.state !== "rejected" ? exp : null;
+  const step = !live ? 0 : live.state === "proposed" ? 1 : live.state === "running" ? 2 : 3;
+  const KIND = { upgrade: "Upgrade", pypi: "Switch package", stdlib: "Use Python built-in", remove: "Remove" };
+  const checkText = (v) => {
+    if (!v) return null;
+    const c = v.checks[0];
+    if (!c) return null;
+    const label = { exists_on_pypi: "Exists on PyPI", is_stdlib_module: "Built into Python", no_static_import_observed: "Unused in code" }[c.check] || c.check;
+    return <span className="okline">{c.result === "pass" ? "✓" : "✗"} {label}</span>;
+  };
 
   return (
     <>
       <div className="toolbar">
         <label>Dependency
           <select value={name} onChange={(e) => select(e.target.value)} disabled={exp?.state === "running"}>
-            {pkgs.map((x) => <option key={x.normalized_name} value={x.normalized_name}>{x.normalized_name} ({x.assessment.band} · {x.assessment.score})</option>)}
+            {pkgs.map((x) => <option key={x.normalized_name} value={x.normalized_name}>{x.normalized_name} (risk {x.assessment.score})</option>)}
           </select>
         </label>
-        <State value={exp ? exp.state : "no_experiment"} />
       </div>
+      <h2>Replace {name}</h2>
+      <Steps current={step} />
 
-      <h3>Ask Gemma 4 <Chip claim="AI-RECOMMENDED" /></h3>
-      <div className="actions">
-        <button className="btn-bone" disabled={!aiReady || !!busy} onClick={askGemma}
-          title={aiReady ? "" : "Set GEMINI_API_KEY in backend/.env and restart the backend"}>
-          {busy === "ai" ? "Asking Gemma..." : ok ? "Ask again" : "Get recommendation"}</button>
-        <span className="muted small">{health?.ai?.model} sees only collected evidence: declarations, PyPI facts, usage snippets.</span>
-      </div>
-      {!aiReady && <p className="note">Gemma 4 is not configured (AI_UNAVAILABLE). No AI output is shown or invented. Deterministic experiments still work.</p>}
-      {rec && !ok && <p className="note">Gemma status <code>{rec.status}</code>: {rec.reason}</p>}
-      {ok && <div className="ai">
-        <p>{rec.recommendation.summary}</p>
-        <p className="muted small">{rec.model_version || rec.model} · {(rec.requested_at || "").slice(0, 19)} · recommended <strong>{rec.recommendation.recommended}</strong></p>
-        <div className="runs">
-          <div><h4>Migration steps</h4><ol>{rec.recommendation.migration_steps.map((s, i) => <li key={i}>{s}</li>)}</ol></div>
-          <div>
-            {rec.recommendation.breaking_changes.length > 0 && <><h4>Possible breaking changes</h4><ul>{rec.recommendation.breaking_changes.map((s, i) => <li key={i}>{s}</li>)}</ul></>}
-            {rec.recommendation.suggested_tests.length > 0 && <><h4>Suggested tests</h4><ul>{rec.recommendation.suggested_tests.map((t, i) => <li key={i}><code>{t.name}</code>: {t.description}</li>)}</ul></>}
-            {rec.recommendation.uncertainties.length > 0 && <><h4>Model's own uncertainties</h4><ul>{rec.recommendation.uncertainties.map((s, i) => <li key={i}>{s}</li>)}</ul></>}
-          </div>
+      {/* Step 1 — choose */}
+      <section className={`stepbox ${step === 0 ? "active" : ""}`}>
+        <h3>1. Choose a replacement</h3>
+        {ok ? <p>{rec.recommendation.summary} <Chip claim="AI-RECOMMENDED" /></p>
+          : <p className="muted">Ask Gemma 4 for ideas, or test the simple upgrade below. {!aiReady && "(Gemma is not configured, so no AI ideas are shown.)"}</p>}
+        <div className="actions">
+          <button className="btn-line" disabled={!aiReady || !!busy} onClick={askGemma}>{busy === "ai" ? "Asking Gemma..." : ok ? "Ask Gemma again" : "Ask Gemma 4 for ideas"}</button>
         </div>
-      </div>}
-
-      <h3>Replacement tournament</h3>
-      <div className="cands">
-        {cards.map((c, i) => {
-          const exists = check(c.v, "exists_on_pypi") || check(c.v, "is_stdlib_module") || check(c.v, "no_static_import_observed");
-          const support = check(c.v, "declared_python_support");
-          return (
-            <article key={`${i}-${c.kind}-${c.package}`} className={picked === c.package && exp?.kind === c.kind ? "cand picked" : "cand"}>
-              <header><code>{c.package}</code><span className="chips"><span className="state">{c.kind}</span>{c.ai ? <Chip claim="AI-RECOMMENDED" /> : <span className="state">deterministic</span>}</span></header>
+        {rec && !ok && <p className="note">Gemma could not answer ({rec.status}). Nothing was invented.</p>}
+        <div className="cands">
+          {cards.map((c, i) => (
+            <article key={`${i}-${c.kind}-${c.package}`} className={live && live.candidate === c.package && live.kind === c.kind ? "cand picked" : "cand"}>
+              <header><code>{c.package}</code><span className="state">{KIND[c.kind] || c.kind}</span></header>
               <p>{c.rationale}</p>
-              {c.ai && <dl>
-                <dt>{c.kind === "stdlib" ? "In stdlib" : c.kind === "remove" ? "Unused in scan" : "Exists on PyPI"}</dt>
-                <dd>{na(exists?.result)} {exists && <Chip claim={exists.evidence_type} />}</dd>
-                <dt>Python 3.12 / 3.13</dt>
-                <dd>{support ? Object.values(support.result).join(" / ").replaceAll("_", " ") : c.kind === "stdlib" ? "verified on running Python only" : "Not available"} {support && <Chip claim="SOURCED" />}</dd>
-              </dl>}
-              {c.pros.length > 0 && <p className="pro">{c.pros.join("; ")}</p>}
-              {c.cons.length > 0 && <p className="con">{c.cons.join("; ")}</p>}
-              <button className="btn-line" disabled={!!busy || exp?.state === "running"} onClick={() => propose(c.package, c.kind)}>
-                {busy === "propose" ? "Building diff..." : "Test this one"}</button>
+              <p className="small">{c.ai ? <Chip claim="AI-RECOMMENDED" /> : <span className="muted">Suggested by GhostLib (no AI)</span>} {checkText(c.v)}</p>
+              <button className="btn-bone" disabled={!!busy || exp?.state === "running"} onClick={() => propose(c.package, c.kind)}>
+                {busy === "propose" ? "Preparing..." : "Use this"}</button>
             </article>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+        {ok && <details className="more"><summary>Gemma's full plan (steps, risks, suggested tests)</summary>
+          <h4>Steps</h4><ol>{rec.recommendation.migration_steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
+          {rec.recommendation.breaking_changes.length > 0 && <><h4>Could break</h4><ul>{rec.recommendation.breaking_changes.map((s, i) => <li key={i}>{s}</li>)}</ul></>}
+          {rec.recommendation.suggested_tests.length > 0 && <><h4>Tests to add</h4><ul>{rec.recommendation.suggested_tests.map((t, i) => <li key={i}><code>{t.name}</code>: {t.description}</li>)}</ul></>}
+          {rec.recommendation.uncertainties.length > 0 && <><h4>Gemma is unsure about</h4><ul>{rec.recommendation.uncertainties.map((s, i) => <li key={i}>{s}</li>)}</ul></>}
+          <p className="muted small">{rec.model_version || rec.model} · {(rec.requested_at || "").slice(0, 19)}</p>
+        </details>}
+      </section>
 
-      {exp && <>
-        <h3>Proposed diff {exp.code_proposal?.status === "ok" ? <Chip claim="AI-RECOMMENDED" /> : <span className="state">deterministic manifest edit</span>}</h3>
-        {(exp.notes || []).map((n, i) => <p key={i} className="muted small">{n}</p>)}
-        {exp.code_proposal?.status && !["ok", "not_requested"].includes(exp.code_proposal.status) &&
-          <p className="note">Gemma code changes: {exp.code_proposal.status} {exp.code_proposal.reason || ""}</p>}
-        <Diff text={exp.diff} />
-        {exp.state === "proposed" && <>
+      {/* Step 2 — review */}
+      {live && <section className={`stepbox ${step === 1 ? "active" : ""}`}>
+        <h3>2. Review the change</h3>
+        <p>To try <strong>{live.manifest_requirement || live.candidate}</strong>, GhostLib would edit {live.changed_files.length} file{live.changed_files.length === 1 ? "" : "s"}: {live.changed_files.map((f) => <code key={f} className="fname">{f}</code>)}.
+          {live.code_proposal?.status === "ok" ? <> The code edits were written by Gemma <Chip claim="AI-RECOMMENDED" />, so read them carefully.</> : " These are simple version edits made by GhostLib."}</p>
+        {live.code_proposal?.status && !["ok", "not_requested"].includes(live.code_proposal.status) &&
+          <p className="note">Gemma could not write the code changes ({live.code_proposal.status}), so only the dependency files change. Tests will show what still breaks.</p>}
+        <Diff text={live.diff} />
+        <p className="muted small">Nothing has run yet. Your project has not been changed.</p>
+      </section>}
+
+      {/* Step 3 — test */}
+      {live && <section className={`stepbox ${step === 2 || step === 1 ? "active" : ""}`}>
+        <h3>3. Test it on a copy</h3>
+        <p>GhostLib copies your project to a temporary folder, installs the <em>current</em> dependencies in one copy and the <em>new</em> ones in another,
+          and runs your test suite in both. Your real project is never touched.</p>
+        {live.state === "proposed" && <>
           <label className="check"><input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} />
-            I reviewed this diff. Apply it to a disposable copy and run baseline and candidate tests.</label>
+            I have read the change above. Run the tests.</label>
           <div className="actions">
             <select value={python} onChange={(e) => setPython(e.target.value)}><option value="3.12">Python 3.12</option><option value="3.13">Python 3.13</option></select>
-            <button className="btn-bone" disabled={!confirm || !!busy} onClick={approve}>Approve in sandbox</button>
-            <button className="btn-line" disabled={!!busy} onClick={reject}>Reject</button>
+            <button className="btn-bone" disabled={!confirm || !!busy} onClick={runTests}>Run tests on a copy</button>
+            <button className="btn-line" disabled={!!busy} onClick={() => drop("Not chosen in review")}>Not this one</button>
           </div>
         </>}
-        {exp.state === "running" && <p className="note">Running: creating virtualenvs, installing, and executing pytest for baseline and candidate (about a minute)...</p>}
-        {exp.state === "failed" && <p className="note">Experiment failed: {exp.error}</p>}
-        {exp.state === "rejected" && <p className="note">{exp.discard_note}</p>}
-        {exp.state === "completed" && <div className="actions">
-          <State value={exp.comparison.verdict} />
-          <button className="btn-bone" onClick={() => go("Verification", name)}>See verification</button>
-          <button className="btn-line" onClick={reject}>Discard candidate</button>
-        </div>}
-        <p className="muted small">{exp.isolation}</p>
-      </>}
-      {!exp && <p className="muted">Approved changes touch the sandbox copy only. Your repository is never modified.</p>}
+        {live.state === "running" && <p className="note">Running tests on both copies... this takes about a minute.</p>}
+        {live.state === "failed" && <p className="note">The test run itself failed: {live.error}</p>}
+        {live.state === "completed" && <p><Verdict c={live.comparison} /></p>}
+      </section>}
+
+      {/* Step 4 — adopt */}
+      {live?.state === "completed" && <section className="stepbox active">
+        <h3>4. Adopt it (your decision, in your editor)</h3>
+        <p>GhostLib never changes your repository. If you are happy with the result, apply the patch yourself:</p>
+        <div className="actions">
+          <a className="btn-bone" href={vscode(live.diff_file, 1)}>Open patch in VS Code</a>
+          <button className="btn-line" onClick={() => go("Verification", name)}>See full test comparison</button>
+        </div>
+        <pre>{`cd "${run.repository}"\ngit apply "${live.diff_file}"`}</pre>
+        <p className="muted small">Done with it? <button className="link" disabled={!!busy} onClick={() => drop("Test copy deleted after review")}>Delete the test copy</button>
+          {" "}removes the temporary folder and its virtualenv to free disk space. The results stay in the report.</p>
+      </section>}
+      {exp?.state === "rejected" && <p className="note">{exp.discard_note}</p>}
     </>
   );
 }
 
 /* ------------------------------------------------------------- Verification */
 
+function Verdict({ c }) {
+  if (!c) return null;
+  const n = c.counts;
+  const s = (k, one, many) => `${n[k]} ${n[k] === 1 ? one : many}`;
+  if (c.verdict === "regressions_detected")
+    return <strong className="v-bad">Breaks something: {s("regression", "test that passed before now fails", "tests that passed before now fail")}.</strong>;
+  if (c.verdict === "insufficient_evidence")
+    return <strong className="v-warn">Not enough evidence: the tests could not run on one of the copies.</strong>;
+  const fixed = n.fixed ? ` It also fixes ${s("fixed", "test that was failing", "tests that were failing")}.` : "";
+  const still = n.still_failing ? ` ${s("still_failing", "test was", "tests were")} already failing before the change and still fail${n.still_failing === 1 ? "s" : ""}.` : "";
+  return <strong className={c.verdict === "no_regressions_observed" ? "v-good" : "v-warn"}>Nothing new broke: every test that passed before still passes.{fixed}{still}</strong>;
+}
+
+const CHANGE_WORDS = {
+  fixed: ["✓", "Now passes (was failing)", "good"], regression: ["✗", "Newly broken", "bad"],
+  still_failing: ["!", "Already failing before", "warn"], unchanged_pass: ["✓", "Still passes", "same"],
+  new_in_candidate: ["+", "New test (only in the new version)", "warn"], missing_in_candidate: ["?", "Did not run in the new version", "bad"],
+};
+const RANK = { regression: 0, missing_in_candidate: 1, fixed: 2, still_failing: 3, new_in_candidate: 4, unchanged_pass: 5 };
+const OUTCOME = { passed: "✓ pass", failed: "✗ fail", error: "✗ error", skipped: "– skip" };
+
 function Run({ title, r, runId, pkg, side }) {
   if (!r) return <div className="run"><h3>{title}</h3><p className="empty">Not run.</p></div>;
   return (
     <div className="run">
-      <h3>{title} <Chip claim="EXECUTION-VERIFIED" /></h3>
-      <State value={r.status} />
-      <p><span className="muted">Python</span><br /><code>{na(r.python_version)}</code></p>
-      <p><span className="muted">Result</span><br />{na(r.summary_line || r.blocker)}</p>
+      <h3>{title}</h3>
+      <p><State value={r.status} /> {na(r.summary_line || r.blocker)} · Python {na(r.python_version)}</p>
       <dl>{r.commands.map((c) => <Fragment key={c.label}><dt><code>{c.label}</code></dt>
         <dd>exit <code>{c.timed_out ? "timeout" : String(c.exit_code)}</code> · {c.duration_seconds}s · <a href={api.logUrl(runId, pkg, `${c.label}.log`, side)} target="_blank" rel="noreferrer">log</a></dd></Fragment>)}</dl>
-      {r.ai_tests && <div className="ai small-pad">
-        <p><Chip claim={["AI-RECOMMENDED", "EXECUTION-VERIFIED"]} /></p>
-        <p>Gemma-written tests <code>{r.ai_tests.files.join(", ")}</code>: <State value={r.ai_tests.status} /> {r.ai_tests.summary_line}</p>
-        {(r.ai_tests.first_errors || []).length > 0 && <p className="muted small">{r.ai_tests.first_errors.join("; ")}</p>}
-        <p className="muted small">{r.ai_tests.note}</p>
-      </div>}
-      {(r.warnings || []).length > 0 && <><h4>Warnings emitted</h4><ul>{r.warnings.map((w) => <li key={w} className="muted small">{w}</li>)}</ul></>}
+      {(r.warnings || []).length > 0 && <><h4>Warnings</h4><ul>{r.warnings.map((w) => <li key={w} className="muted small">{w}</li>)}</ul></>}
     </div>
   );
 }
@@ -393,13 +453,14 @@ function Run({ title, r, runId, pkg, side }) {
 function Verification({ run, capsule, selected, select, go }) {
   const exps = Object.values(run.experiments || {});
   if (!exps.length) return <>
-    <h2>Verification</h2>
-    <p className="empty">Nothing has been executed yet. Results appear only after GhostLib actually runs baseline and candidate tests.</p>
-    <div className="actions"><button className="btn-bone" onClick={() => go("Migration")}>Open Migration</button></div>
+    <h2>Test comparison</h2>
+    <p className="empty">Nothing has been tested yet. Results appear here only after GhostLib actually runs your tests.</p>
+    <div className="actions"><button className="btn-bone" onClick={() => go("Migration")}>Go to Migration</button></div>
   </>;
   const e = exps.find((x) => x.package === selected) || exps.find((x) => x.state === "completed") || exps[0];
   const gaps = (capsule?.dependencies || []).find((d) => d.package === e.package)?.compatibility_gaps || [];
   const c = e.comparison;
+  const ai = e.candidate_run?.ai_tests;
   return (
     <>
       <div className="toolbar">
@@ -408,37 +469,38 @@ function Verification({ run, capsule, selected, select, go }) {
             {exps.map((x) => <option key={x.package} value={x.package}>{x.package} → {x.manifest_requirement || x.candidate} ({x.state})</option>)}
           </select>
         </label>
-        {c && <State value={c.verdict} />}
       </div>
       <h2>{e.package} → {e.manifest_requirement || e.candidate}</h2>
-      {e.state !== "completed" ? <p className="empty">{e.error || e.discard_note || `State: ${e.state}. No execution results exist.`}</p> : <>
-        <section className="stats">
-          <div><b>{c.counts.fixed}</b><span>fixed</span></div>
-          <div><b>{c.counts.regression}</b><span>regressions</span></div>
-          <div><b>{c.counts.still_failing}</b><span>still failing</span></div>
-          <div><b>{String(e.original_repository_check?.unchanged)}</b><span>original repo unchanged</span></div>
-        </section>
-        <div className="runs">
-          <Run title="Original baseline" r={e.baseline_run} runId={run.run_id} pkg={e.package} side="baseline" />
-          <Run title="Candidate" r={e.candidate_run} runId={run.run_id} pkg={e.package} side="candidate" />
-        </div>
-        <h3>Behavioural comparison</h3>
-        <p className="note">{c.caveat}</p>
-        <div className="runs">
-          <div className="run"><h3>Checked <Chip claim="EXECUTION-VERIFIED" /></h3>
-            <ul>{c.tests.map((t) => <li key={t.test}><code>{t.test}</code>: {na(t.baseline)} → {na(t.candidate)} <State value={t.change} /></li>)}</ul>
-            {Object.entries(c.installed_version_changes).map(([k, v]) => <p key={k} className="muted small">Installed <code>{k}</code>: {na(v.baseline)} → {na(v.candidate)}</p>)}
-            {c.warnings_removed.length > 0 && <p className="muted small">Warnings gone: {c.warnings_removed.join("; ")}</p>}
-            {c.warnings_added.length > 0 && <p className="muted small">New warnings: {c.warnings_added.join("; ")}</p>}
+      {e.state !== "completed" ? <p className="empty">{e.error || e.discard_note || `State: ${e.state}. No test results exist.`}</p> : <>
+        <p className="verdict"><Verdict c={c} /> <Chip claim="EXECUTION-VERIFIED" /></p>
+        <p className="muted">Same tests, run twice on Python {e.candidate_run?.python_version}: once with the <b>current</b> dependencies, once with the <b>new</b> one.
+          Your original project was {e.original_repository_check?.unchanged ? "verified unchanged" : "NOT verified unchanged"}.</p>
+        <table className="cmp">
+          <thead><tr><th>Test</th><th>Before (current)</th><th>After (new)</th><th>What it means</th></tr></thead>
+          <tbody>{[...c.tests].sort((a, b) => RANK[a.change] - RANK[b.change]).map((t) => {
+            const [icon, words, tone] = CHANGE_WORDS[t.change] || ["", t.change, "same"];
+            return <tr key={t.test} className={`tone-${tone}`}><td><code>{t.test.replace(/^tests\./, "")}</code></td>
+              <td>{OUTCOME[t.baseline] || "—"}</td><td>{OUTCOME[t.candidate] || "—"}</td><td><b>{icon}</b> {words}</td></tr>;
+          })}</tbody>
+        </table>
+        {Object.keys(c.installed_version_changes).length > 0 && <p className="muted">Installed versions that differ: {Object.entries(c.installed_version_changes).map(([k, v]) => `${k} ${v.baseline || "none"} → ${v.candidate || "none"}`).join(", ")}</p>}
+        {ai && <div className="ai">
+          <p><Chip claim="AI-RECOMMENDED" /> Gemma also wrote new tests (<code>{ai.files.join(", ")}</code>). They were run separately, so a broken AI test cannot hide the real result:
+            {" "}<State value={ai.status} /> {ai.summary_line}</p>
+          {(ai.first_errors || []).length > 0 && <p className="muted small">{ai.first_errors.join("; ")}</p>}
+        </div>}
+        <h3>What is still not proven</h3>
+        <p className="note">Passing tests only cover the code paths those tests exercise. They do not prove the two versions behave identically.</p>
+        {gaps.length ? <ul>{gaps.map((g, i) => <li key={i}><Chip claim={g.type} /> {g.gap}</li>)}</ul> : <p className="empty">No gaps recorded.</p>}
+        <details className="more"><summary>Technical details: commands, exit codes, logs, the applied diff</summary>
+          <div className="runs">
+            <Run title="Before (current dependencies)" r={e.baseline_run} runId={run.run_id} pkg={e.package} side="baseline" />
+            <Run title="After (new dependency)" r={e.candidate_run} runId={run.run_id} pkg={e.package} side="candidate" />
           </div>
-          <div className="run"><h3>Gaps and not tested</h3>
-            {gaps.length ? <ul>{gaps.map((g, i) => <li key={i}><Chip claim={g.type} /> {g.gap}</li>)}</ul> : <p className="empty">None recorded.</p>}
-          </div>
-        </div>
-        <h3>Approved diff</h3>
-        <p className="muted small">Approved by {e.approval?.approved_by} at {(e.approval?.approved_at || "").slice(0, 19)} · SHA-256 {(e.approval?.diff_sha256 || "").slice(0, 12)}</p>
-        <Diff text={e.diff} />
-        <p className="muted small">{e.isolation}</p>
+          <p className="muted small">Approved by {e.approval?.approved_by} at {(e.approval?.approved_at || "").slice(0, 19)} · patch SHA-256 {(e.approval?.diff_sha256 || "").slice(0, 12)}</p>
+          <Diff text={e.diff} />
+          <p className="muted small">{e.isolation}</p>
+        </details>
       </>}
     </>
   );

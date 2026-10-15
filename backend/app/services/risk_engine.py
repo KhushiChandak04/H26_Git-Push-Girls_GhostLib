@@ -31,6 +31,32 @@ RUBRIC = {
     "unconstrained_version": 0,
     "metadata_unavailable": 0,
 }
+# Plain-language description of every rule and where its input comes from (served to the UI).
+RULE_DOCS = {
+    "declaration_conflict": ("OBSERVED", "Manifests", "The same package is pinned differently in two manifest files."),
+    "pinned_python_incompatible": ("SOURCED", "PyPI", "The pinned version's Requires-Python excludes Python 3.12 or 3.13."),
+    "pinned_version_yanked": ("SOURCED", "PyPI", "The pinned version was yanked (or is missing) on PyPI."),
+    "inactive_development_status": ("SOURCED", "PyPI", "The package marks itself Inactive or Obsolete."),
+    "no_release_in_years": ("SOURCED", "PyPI", f"No release uploaded in {STALE_YEARS}+ years (a maintenance signal, not proof of abandonment)."),
+    "pinned_major_behind_latest": ("SOURCED", "PyPI", "The pinned version is at least one major version behind the latest."),
+    "private_api_usage": ("OBSERVED", "Source code (AST)", "The code imports or calls an underscore-prefixed (private) API."),
+    "runtime_monkeypatch_target": ("OBSERVED", "Source code (AST)", "The code replaces one of the library's methods at import time."),
+    "pinned_release_old": ("SOURCED", "PyPI", f"The pinned version itself is {STALE_YEARS}+ years old."),
+    "target_python_not_declared": ("SOURCED", "PyPI", "The latest release lists no classifier for Python 3.12 or 3.13."),
+    "declared_not_imported": ("OBSERVED", "Source code (AST)", "Declared in a manifest, but never imported by any scanned file."),
+    "no_relevant_tests": ("OBSERVED", "Source code (AST)", "No test file reaches the code that uses this package."),
+    "unconstrained_version": ("OBSERVED", "Manifests", "No version constraint, so installs are not reproducible (0 points: informational)."),
+    "metadata_unavailable": ("UNKNOWN", "PyPI", "PyPI could not be reached; unknown is not counted as risk."),
+}
+
+
+def rubric() -> dict:
+    return {
+        "computed_by": "Deterministic rules in backend/app/services/risk_engine.py. Gemma 4 is never used for scoring.",
+        "bands": {name: threshold for threshold, name in SCORE_BANDS},
+        "rules": [{"indicator": key, "points": pts, "evidence_type": RULE_DOCS[key][0], "source": RULE_DOCS[key][1],
+                   "description": RULE_DOCS[key][2]} for key, pts in RUBRIC.items()],
+    }
 
 
 def _years_since(iso: str | None) -> float | None:

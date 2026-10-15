@@ -142,3 +142,44 @@ a.btn-bone{color:var(--plum)}a.btn-line{color:var(--bone)}
 .run,.ev,.usage-h,.detail p,.detail li,.kv dd{overflow-wrap:anywhere}
 .usage-h{flex-wrap:wrap}
 @media (max-width:600px){.nav{gap:.6rem 1rem}.nav nav{justify-content:flex-start;gap:.9rem}h2{font-size:1.6rem}.panel .row{grid-template-columns:1fr 1fr}.stats b{font-size:1.9rem}}
+
+/* ---- uniform evidence chips (overrides earlier chip styles) ---- */
+.chips{display:inline-flex;gap:.35rem;vertical-align:middle;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:.35rem;height:1.45rem;padding:0 .6rem;border-radius:999px;border:0;
+  font-family:var(--mono);font-size:.68rem;font-weight:500;letter-spacing:.04em;text-transform:uppercase;line-height:1;cursor:help;white-space:nowrap}
+.chip::before{content:"";width:.42rem;height:.42rem;border-radius:50%;background:currentColor;opacity:.85}
+.chip-observed{background:#cfe3d6;color:#14321f;border:0}
+.chip-sourced{background:#f3cf8c;color:#3b2506;border:0}
+.chip-verified{background:var(--bone);color:#0f3d22;border:0}
+.chip-verified::before{content:"✓";width:auto;height:auto;background:none;font-size:.7rem;opacity:1}
+.chip-ai{background:var(--blood);color:var(--bone);border:0}
+.chip-unknown{background:transparent;color:var(--mute);border:1.5px dashed var(--mute)}
+
+/* ---- migration steps ---- */
+.steps{display:flex;gap:.5rem;list-style:none;padding:0;margin:0 0 1.5rem;flex-wrap:wrap}
+.steps li{display:flex;align-items:center;gap:.5rem;padding:.4rem .9rem;border:1.5px solid var(--line);border-radius:999px;color:var(--mute);font-size:.9rem}
+.steps li b{display:inline-grid;place-items:center;width:1.4rem;height:1.4rem;border-radius:50%;background:var(--line);color:var(--bone);font-size:.75rem}
+.steps li.done{color:var(--bone);border-color:var(--bone)}.steps li.done b{background:var(--bone);color:var(--plum)}
+.steps li.now{color:var(--plum);background:var(--mustard);border-color:var(--mustard);font-weight:600}.steps li.now b{background:var(--plum);color:var(--mustard)}
+.stepbox{border:1px solid var(--line);padding:1rem 1.3rem 1.2rem;margin-bottom:1.2rem;opacity:.75}
+.stepbox.active{opacity:1;border-color:var(--bone)}
+.stepbox h3{margin-top:.2rem}
+.fname{margin:0 .25rem;padding:.05rem .4rem;background:var(--plum2);border:1px solid var(--line)}
+.okline{margin-left:.5rem;color:var(--bone);font-size:.82rem}
+.cand .btn-bone{align-self:flex-start;margin-top:auto}
+.link{background:none;border:0;padding:0;color:var(--mustard);text-decoration:underline}
+details.more{margin:1rem 0}
+details.more summary{cursor:pointer;color:var(--mustard);font-weight:600}
+h2.inline{display:inline;font-size:1.5rem}
+
+/* ---- plain comparison ---- */
+.verdict{font-size:1.15rem;line-height:1.5;margin:.5rem 0 1rem;display:flex;gap:.8rem;align-items:center;flex-wrap:wrap}
+.v-good{color:#bfe8c9}.v-warn{color:var(--mustard)}.v-bad{color:#ff8f7d}
+table.cmp{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.9rem}
+table.cmp th{text-align:left;color:var(--mute);font-weight:600;border-bottom:2px solid var(--bone);padding:.5rem .6rem}
+table.cmp td{border-bottom:1px solid var(--line);padding:.55rem .6rem;vertical-align:top;overflow-wrap:anywhere}
+table.cmp tr.tone-good td{background:#1d2a1f}table.cmp tr.tone-bad td{background:#3a1512}table.cmp tr.tone-warn td:last-child{color:var(--mustard)}
+@media (max-width:600px){table.cmp{font-size:.8rem}table.cmp th:nth-child(4),table.cmp td:nth-child(4){display:none}}
+.stepbox,.ai,details.more{min-width:0;max-width:100%}
+pre{max-width:100%}
+.fname{display:inline-block;max-width:100%;overflow-wrap:anywhere;vertical-align:bottom}

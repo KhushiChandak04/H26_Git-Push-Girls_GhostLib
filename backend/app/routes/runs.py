@@ -49,6 +49,12 @@ def health():
     return {"status": "ok", "project": "GhostLib", "ai": gemma.model_info()}
 
 
+@router.get("/rubric")
+def risk_rubric():
+    from app.services.risk_engine import rubric
+    return rubric()
+
+
 @router.get("/ai/status")
 def ai_status():
     return gemma.verify_model()
