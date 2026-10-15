@@ -26,6 +26,10 @@ export default function VerificationCenter({ run, selected, setSelected, go }) {
             <table className="table compact"><thead><tr><th>Command</th><th>Exit</th><th>Time</th><th>Log</th></tr></thead>
               <tbody>{r.commands.map(c => <tr key={c.label}><td><code>{c.label}</code></td><td>{c.timed_out ? "timeout" : String(c.exit_code)}</td><td>{c.duration_seconds}s</td>
                 <td><a href={api.logUrl(run.run_id, exp.package, `${c.label}.log`, side)} target="_blank" rel="noreferrer">view</a></td></tr>)}</tbody></table>
+            {r.ai_tests && <div className="ai-box"><div className="ai-head"><Evidence type="AI-RECOMMENDED" /> tests · results <Evidence type="EXECUTION-VERIFIED" /></div>
+              <p><code>{r.ai_tests.files.join(", ")}</code> <Status value={r.ai_tests.status} /> {r.ai_tests.summary_line}</p>
+              {r.ai_tests.first_errors?.length > 0 && <p className="muted">{r.ai_tests.first_errors.join("; ")}</p>}
+              <p className="muted">{r.ai_tests.note}</p></div>}
             {r.warnings?.length > 0 && <><h3>Warnings emitted</h3><ul className="plain small">{r.warnings.map(w => <li key={w}>{w}</li>)}</ul></>}
           </Panel>)}
       </div>

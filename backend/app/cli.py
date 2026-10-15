@@ -65,7 +65,18 @@ def cmd_experiment(args) -> int:
         _print(experiment.reject(args.run_id, args.package, reason="rejected via CLI"))
         generate_for_run(args.run_id)
         return 0
-    proposal = experiment.propose(args.run_id, args.package, candidate=args.candidate, kind=args.kind)
+    existing = None
+    if args.approve:
+        try:
+            existing = experiment.get_experiment(args.run_id, args.package)
+        except FileNotFoundError:
+            existing = None
+    if existing and existing.get("state") == "proposed" and args.candidate in (None, existing["candidate"]):
+        # Approve exactly the proposal that was reviewed; never regenerate (AI output can differ).
+        proposal = existing
+        print(f"Approving the existing reviewed proposal (diff sha256 of {len(proposal['diff'])} chars).")
+    else:
+        proposal = experiment.propose(args.run_id, args.package, candidate=args.candidate, kind=args.kind)
     print(f"Proposed candidate: {proposal['candidate']} ({proposal['kind']})")
     for note in proposal["notes"]:
         print("  note:", note)

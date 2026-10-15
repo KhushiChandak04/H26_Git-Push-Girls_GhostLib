@@ -31,4 +31,6 @@ MAX_SOURCE_FILE_BYTES = int(os.getenv("GHOSTLIB_MAX_SOURCE_FILE_BYTES", "1000000
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 GEMMA_MODEL = os.getenv("GEMMA_MODEL", "gemma-4-26b-a4b-it")
 GEMMA_API_BASE = os.getenv("GEMMA_API_BASE", "https://generativelanguage.googleapis.com/v1beta")
-GEMMA_TIMEOUT_SECONDS = float(os.getenv("GEMMA_TIMEOUT_SECONDS", "120"))
+GEMMA_TIMEOUT_SECONDS = float(os.getenv("GEMMA_TIMEOUT_SECONDS", "300"))
+# "minimal" keeps Gemma 4's hidden reasoning from exhausting the output budget; set empty to disable.
+GEMMA_THINKING_LEVEL = os.getenv("GEMMA_THINKING_LEVEL", "minimal")

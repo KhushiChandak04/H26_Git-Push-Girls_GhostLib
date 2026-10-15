@@ -60,6 +60,13 @@ Every statement in the dashboard and the capsule carries one of these labels:
 |---|---|---|
 | Baseline (`Jinja2==2.11.3`) | 9 passed, 1 failed | `test_report` fails because `jinja2` imports `soft_unicode`, which `markupsafe` 3.x removed |
 | Candidate (`Jinja2==3.1.6`) | 10 passed | 1 fixed, 0 regressions; original repository verified unchanged |
+| Candidate `toml` → stdlib `tomllib` (Gemma 4 code edit, reviewed diff) | 9 passed, 1 failed | 0 regressions; only the pre-existing Jinja2 failure remains; `toml` no longer installed |
+
+Two caveats GhostLib recorded for the tomllib experiment:
+- Gemma's proposed regression test had a bug (a missing `import tempfile`), so it failed to collect. It ran in a
+  separate pass, so it could not hide the migration's real result.
+- The project still allows Python 3.10 (`requires-python >=3.10`), but the stdlib replacement was only verified on
+  the versions tested here.
 
 Other findings from the same scan:
 - `certifi` is imported but not declared.
@@ -106,6 +113,11 @@ ghostlib ai-check                       # verifies the model is reachable and re
 - **What is sent:** only the collected evidence. That means declarations, PyPI facts, risk indicators, usage
   locations with short snippets, and the bodies of functions that use the dependency. For code-change proposals, the
   full content of the affected source files is sent too.
+- **Generation settings:** requests use JSON output mode and `thinkingConfig.thinkingLevel = "minimal"`
+  (`GEMMA_THINKING_LEVEL`). Without it, Gemma 4's hidden reasoning was observed to use the entire output budget:
+  8,189 thought tokens, no answer, then HTTP 500s. With it, recommendations return in about 12–22 s.
+- **AI-written tests:** they run in a second pytest pass, separate from the repository's own suite. Only the
+  repository's suite is compared against the baseline.
 - **Fallback:** without a key, every AI step reports `AI_UNAVAILABLE`. Scanning, metadata, risk, deterministic upgrade
   and removal experiments, and the capsule all keep working.
 

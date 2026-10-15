@@ -24,7 +24,7 @@ LEGEND = {
 }
 
 
-def _compat_gaps(pkg: dict, exp: dict | None) -> list[dict]:
+def _compat_gaps(pkg: dict, exp: dict | None, requires_python: str | None = None) -> list[dict]:
     gaps = []
     usage = pkg.get("usage") or {}
     if usage.get("coverage_gap"):
@@ -47,6 +47,15 @@ def _compat_gaps(pkg: dict, exp: dict | None) -> list[dict]:
     cand = exp.get("candidate_run") or {}
     if cand.get("status") == "could_not_run":
         gaps.append({"type": "EXECUTION-VERIFIED", "gap": f"Candidate could not run: {cand.get('blocker')}"})
+    if exp.get("kind") == "stdlib" and requires_python:
+        gaps.append({"type": "UNKNOWN", "gap": f"Project declares requires-python '{requires_python}'. The stdlib "
+                     f"module '{exp.get('candidate')}' was only verified on the Python versions tested here; it may "
+                     "not exist on older interpreters the project still allows. Raise requires-python or keep a fallback."})
+    ai = cand.get("ai_tests")
+    if ai and ai.get("status") != "passed":
+        gaps.append({"type": "EXECUTION-VERIFIED", "gap": f"AI-proposed regression tests ({', '.join(ai['files'])}) "
+                     f"did not pass: {ai.get('status')} — {ai.get('summary_line')}; {'; '.join(ai.get('first_errors') or [])}. "
+                     "The AI tests themselves may be wrong; review before adopting them."})
     tested = {cand.get("python_version")}
     for v in ("3.12", "3.13"):
         if not any((t or "").startswith(v) for t in tested):
@@ -62,7 +71,12 @@ def _experiment_summary(exp: dict) -> dict:
         rec = exp.get(f"{side}_run")
         if rec:
             out[f"{side}_run"] = {k: rec.get(k) for k in ("evidence_type", "status", "python_version", "summary_line", "exit_code",
-                                                 "blocker", "warnings", "installed", "workspace")}
+                                                 "blocker", "warnings", "installed", "workspace", "first_errors")}
+            if rec.get("ai_tests"):
+                ai = rec["ai_tests"]
+                out[f"{side}_run"]["ai_tests"] = {k: ai.get(k) for k in ("files", "status", "summary_line",
+                                                                       "first_errors", "note", "evidence_type")}
+                out[f"{side}_run"]["ai_tests"]["cases"] = {k: v["outcome"] for k, v in (ai.get("tests") or {}).get("cases", {}).items()}
             out[f"{side}_run"]["test_counts"] = (rec.get("tests") or {}).get("counts")
             out[f"{side}_run"]["commands"] = [{k: c[k] for k in ("argv", "cwd", "exit_code", "timed_out", "duration_seconds", "log")}
                                      for c in rec.get("commands", [])]
@@ -95,7 +109,7 @@ def build_capsule(run: dict) -> dict:
                       "locations": pkg.get("locations", [])},
             "recommendation": _recommendation_view(rec),
             "experiment": _experiment_summary(exp) if exp else {"state": "not_run"},
-            "compatibility_gaps": _compat_gaps(pkg, exp),
+            "compatibility_gaps": _compat_gaps(pkg, exp, run.get("python_requirement")),
         }
         deps.append(entry)
 
@@ -285,6 +299,11 @@ def capsule_markdown(c: dict) -> str:
                 if rec_:
                     L.append(f"- {side.title()} [EXECUTION-VERIFIED]: `{rec_.get('status')}` on Python {rec_.get('python_version')} — "
                              f"{rec_.get('summary_line') or rec_.get('blocker')}")
+                    if rec_.get("ai_tests"):
+                        ai = rec_["ai_tests"]
+                        L.append(f"  - AI-proposed tests [AI-RECOMMENDED tests, EXECUTION-VERIFIED results] "
+                                 f"{', '.join(ai['files'])}: `{ai['status']}` — {ai.get('summary_line')}"
+                                 + (f" ({'; '.join(ai['first_errors'])})" if ai.get("first_errors") else ""))
                     for cmd in rec_.get("commands", []):
                         L.append(f"  - `{_short_cmd(cmd['argv'])}` → exit {cmd['exit_code']}"
                                  f"{' (timed out)' if cmd['timed_out'] else ''}, {cmd['duration_seconds']}s")

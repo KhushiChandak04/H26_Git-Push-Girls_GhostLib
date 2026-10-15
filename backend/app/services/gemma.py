@@ -171,23 +171,31 @@ def propose_code_changes(*, package: str, candidate: str, kind: str, files: dict
     rendered = "\n\n".join(f"=== {path} ===\n{content}" for path, content in files.items())
     prompt = CODE_PROMPT.format(package=package, candidate=candidate, kind=kind,
                                 slug=re.sub(r"[^a-z0-9]+", "_", package.lower()), guidance=guidance, files=rendered)
-    return _generate(prompt, CodeChangeProposal, "proposal", max_tokens=8192)
+    return _generate(prompt, CodeChangeProposal, "proposal", max_tokens=16384)
 
 
-def recommend_migration(evidence: dict, *, retries: int = 1) -> dict:
+def recommend_migration(evidence: dict, *, retries: int = 2) -> dict:
     """Return {status, recommendation?, raw_text, prompt, ...}. Never raises for API problems."""
     prompt = SYSTEM_PROMPT + json.dumps(SCHEMA_HINT, indent=1) + "\n\nEVIDENCE:\n" + json.dumps(evidence, indent=1)
     return _generate(prompt, MigrationRecommendation, "recommendation", retries=retries)
 
 
-def _generate(prompt: str, schema: type[BaseModel], key: str, *, retries: int = 1, max_tokens: int = 4096) -> dict:
+def _generate(prompt: str, schema: type[BaseModel], key: str, *, retries: int = 2, max_tokens: int = 8192) -> dict:
+    """Call Gemma in JSON mode. The output budget must cover Gemma 4's thinking tokens as well as
+    the answer (observed: ~1.7k thought tokens for a recommendation), hence the large limits."""
     base = {"evidence_type": "AI-RECOMMENDED", **model_info(),
             "requested_at": datetime.now(timezone.utc).isoformat()}
     if not config.GEMINI_API_KEY:
         return {**base, "status": "AI_UNAVAILABLE",
                 "reason": "GEMINI_API_KEY is not set. Deterministic scan results remain valid; no AI output was generated."}
     body = {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.2, "maxOutputTokens": max_tokens}}
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": max_tokens,
+                                 "responseMimeType": "application/json"}}
+    if config.GEMMA_THINKING_LEVEL:
+        # Unbounded thinking was observed to consume the entire output budget (8k thought tokens,
+        # no answer). "minimal" is the only thinking control this model accepts via the API.
+        body["generationConfig"]["thinkingConfig"] = {"thinkingLevel": config.GEMMA_THINKING_LEVEL}
+    base["generation_config"] = body["generationConfig"]
     url = f"{config.GEMMA_API_BASE}/models/{quote(config.GEMMA_MODEL)}:generateContent"
     base["prompt_sha256"] = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     base["prompt"] = prompt
@@ -199,8 +207,12 @@ def _generate(prompt: str, schema: type[BaseModel], key: str, *, retries: int = 
             data = _post(url, body, config.GEMMA_TIMEOUT_SECONDS)
         except HTTPError as exc:
             last_error = f"HTTP {exc.code}: {_error_text(exc)}"
-            if exc.code in (429, 500, 503) and attempt < retries:
-                time.sleep(4 * (attempt + 1))
+            if exc.code == 400 and "thinkingConfig" in body["generationConfig"] and "hinking" in last_error:
+                body["generationConfig"].pop("thinkingConfig")  # model rejects the setting; retry without
+                base["generation_config"] = body["generationConfig"]
+                continue
+            if exc.code in (429, 500, 502, 503, 504) and attempt < retries:
+                time.sleep(5 * (attempt + 1))
                 continue
             return {**base, "status": "AI_ERROR", "reason": last_error}
         except (URLError, TimeoutError, OSError, ValueError) as exc:

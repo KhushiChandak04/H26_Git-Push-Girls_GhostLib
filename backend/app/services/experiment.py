@@ -117,7 +117,8 @@ def _requirement_files(workspace: Path) -> list[str]:
     return sorted(p.name for p in workspace.glob("requirements*.txt"))
 
 
-def prepare_and_test(workspace: Path, venv: Path, log_dir: Path, boundary: Path, python: str) -> dict:
+def prepare_and_test(workspace: Path, venv: Path, log_dir: Path, boundary: Path, python: str,
+                     extra_test_files: list[str] | None = None) -> dict:
     """Create venv, install declared requirements, run pytest. Returns an execution record."""
     commands = []
     uv = shutil.which("uv")
@@ -153,20 +154,41 @@ def prepare_and_test(workspace: Path, venv: Path, log_dir: Path, boundary: Path,
                           workspace, log_dir, "03b-python-version", 60, boundary)
     record["python_version"] = version["stdout_tail"].strip()
 
+    # Pass A: the repository's own test suite (AI-added test files ignored) — like-for-like with baseline.
+    pytest_base = [str(py), "-m", "pytest", "-q", "-rA", "-W", "default", "-p", "no:cacheprovider"]
+    ignores = [f"--ignore={f}" for f in extra_test_files or []]
     junit = log_dir / "junit.xml"
-    commands.append(run_command([str(py), "-m", "pytest", "-q", "-rA", "-W", "default", "-p", "no:cacheprovider",
-                                 f"--junitxml={junit}"], workspace, log_dir, "04-pytest", TEST_TIMEOUT, boundary))
-    test_cmd = commands[-1]
-    record["tests"] = parse_junit(junit)
-    full_out = (log_dir / "04-pytest.log").read_text(encoding="utf-8", errors="replace")
-    record["warnings"] = parse_warnings(full_out)
-    record["summary_line"] = next((l.strip("= ") for l in reversed(full_out.splitlines())
-                                   if re.search(r"\d+ (passed|failed|error)", l)), None)
-    record["exit_code"] = test_cmd["exit_code"]
-    record["status"] = ("timed_out" if test_cmd["timed_out"] else
-                        "passed" if test_cmd["exit_code"] == 0 else
-                        "tests_failed" if test_cmd["exit_code"] == 1 else "could_not_run")
+    commands.append(run_command(pytest_base + ignores + [f"--junitxml={junit}"], workspace, log_dir,
+                                "04-pytest", TEST_TIMEOUT, boundary))
+    record.update(_pytest_result(commands[-1], junit, log_dir / "04-pytest.log"))
+
+    # Pass B: AI-proposed regression tests, executed and reported separately so a broken AI test
+    # cannot mask (or be confused with) the migration's effect on the existing suite.
+    if extra_test_files:
+        ai_junit = log_dir / "junit-ai-tests.xml"
+        commands.append(run_command(pytest_base + list(extra_test_files) + [f"--junitxml={ai_junit}"], workspace,
+                                    log_dir, "05-pytest-ai-tests", TEST_TIMEOUT, boundary))
+        record["ai_tests"] = {"files": list(extra_test_files), "evidence_type": "EXECUTION-VERIFIED",
+                              "note": "Tests written by Gemma; their results are reported separately from the "
+                                      "repository's own suite.",
+                              **_pytest_result(commands[-1], ai_junit, log_dir / "05-pytest-ai-tests.log")}
     return record
+
+
+def _pytest_result(cmd: dict, junit: Path, log: Path) -> dict:
+    full_out = log.read_text(encoding="utf-8", errors="replace") if log.is_file() else ""
+    errors = re.findall(r"^E\s+(\w+(?:Error|Exception)[^\n]*)", full_out, flags=re.MULTILINE)
+    return {
+        "tests": parse_junit(junit),
+        "warnings": parse_warnings(full_out),
+        "summary_line": next((l.strip("= ") for l in reversed(full_out.splitlines())
+                              if re.search(r"\d+ (passed|failed|error)", l)), None),
+        "first_errors": sorted(set(errors))[:5],
+        "exit_code": cmd["exit_code"],
+        "status": ("timed_out" if cmd["timed_out"] else "passed" if cmd["exit_code"] == 0 else
+                   "tests_failed" if cmd["exit_code"] == 1 else
+                   "collection_error" if cmd["exit_code"] == 2 else "could_not_run"),
+    }
 
 
 def parse_junit(path: Path) -> dict:
@@ -432,7 +454,8 @@ def approve_and_run(run_id: str, package: str, approved_by: str = "local user", 
                 raise ValueError(f"Edit escapes workspace: {rel}")
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
-        candidate = prepare_and_test(workspace, edir / "venv", edir / "logs", rdir, python)
+        ai_tests = sorted(r for r in edits if re.match(r"^tests/test_ghostlib_[a-z0-9_]+\.py$", r))
+        candidate = prepare_and_test(workspace, edir / "venv", edir / "logs", rdir, python, ai_tests)
         candidate.update(kind="candidate", evidence_type="EXECUTION-VERIFIED", completed_at=_now())
         after = _original_state(repo, scan["manifests"])
         record.update(
