@@ -3,13 +3,12 @@ import { api } from "./services/api.js";
 
 const na = (v) => (v === undefined || v === null || v === "" ? "Not available" : v);
 const TABS = ["Overview", "Dependencies", "Migration", "Verification", "Capsule"];
+// Display names/colours only; the meaning of each label is served by the backend (/api/health).
 const EVIDENCE = {
-  OBSERVED: ["observed", "Observed", "Read directly from the repository: manifests, source code (AST) or git."],
-  SOURCED: ["sourced", "Sourced", "Fetched from PyPI's JSON API; the URL and time are recorded."],
-  "EXECUTION-VERIFIED": ["verified", "Verified", "Produced by a command GhostLib actually ran (exit code and log recorded)."],
-  "AI-RECOMMENDED": ["ai", "AI", "Suggested by Gemma 4. Checked for shape, not proven correct."],
-  UNKNOWN: ["unknown", "Unknown", "Could not be established, or not tested."],
+  OBSERVED: ["observed", "Observed"], SOURCED: ["sourced", "Sourced"], "EXECUTION-VERIFIED": ["verified", "Verified"],
+  "AI-RECOMMENDED": ["ai", "AI"], UNKNOWN: ["unknown", "Unknown"],
 };
+let LEGEND = {};
 const storage = {
   get: (k) => { try { return window.localStorage.getItem(k); } catch { return null; } },
   set: (k, v) => { try { window.localStorage.setItem(k, v); } catch { /* private mode */ } },
@@ -18,8 +17,8 @@ const storage = {
 const Chip = ({ claim }) => (
   <span className="chips">
     {(Array.isArray(claim) ? claim : [claim || "UNKNOWN"]).map((c) => {
-      const [cls, label, tip] = EVIDENCE[c] || EVIDENCE.UNKNOWN;
-      return <span key={c} className={`chip chip-${cls}`} title={`${c}: ${tip}`}>{label}</span>;
+      const [cls, label] = EVIDENCE[c] || EVIDENCE.UNKNOWN;
+      return <span key={c} className={`chip chip-${cls}`} title={`${c}: ${LEGEND[c] || ""}`}>{label}</span>;
     })}
   </span>
 );
@@ -63,6 +62,16 @@ function Diff({ text }) {
 
 /* ------------------------------------------------------------------ Overview */
 
+const isUrl = (v) => /^(https?:\/\/|git@)/i.test((v || "").trim());
+function inputHint(v) {
+  const t = (v || "").trim();
+  if (!t) return "";
+  if (isUrl(t) && !/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+?(\.git)?\/?$/i.test(t))
+    return "Not supported: only public GitHub URLs like https://github.com/owner/repo. For other hosts, clone it and enter the local path.";
+  if (isUrl(t)) return "GitHub URL detected: GhostLib will make a shallow clone into artifacts/clones/ and scan that copy.";
+  return "";
+}
+
 function Overview({ run, runs, openRun, scan, go }) {
   const [repo, setRepo] = useState(() => storage.get("ghostlib.repo") || "");
   const [fetchMeta, setFetchMeta] = useState(true);
@@ -72,8 +81,11 @@ function Overview({ run, runs, openRun, scan, go }) {
   const flagged = pkgs.filter((p) => p.assessment.score > 0).length;
   const tested = Object.values(run?.experiments || {}).filter((e) => e.state === "completed").length;
 
+  const hint = inputHint(repo);
   const submit = async (e) => {
-    e.preventDefault(); setBusy(true); storage.set("ghostlib.repo", repo);
+    e.preventDefault();
+    if (hint && hint.startsWith("Not supported")) return;
+    setBusy(true); storage.set("ghostlib.repo", repo);
     try { await scan(repo, fetchMeta); } finally { setBusy(false); }
   };
 
@@ -95,13 +107,14 @@ function Overview({ run, runs, openRun, scan, go }) {
       <section className="panel scan">
         <h2>Summon a scan</h2>
         <form onSubmit={submit}>
-          <label className="field">Absolute path to a local checkout
-            <input value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="C:\path\to\LinkWatch" required />
+          <label className="field">Local repository path <span className="muted small">(or a public GitHub URL, which GhostLib clones for you)</span>
+            <input value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="D:\GitHub\LinkWatch   or   https://github.com/rishrek/LinkWatch" required />
           </label>
+          {hint && <p className="note">{hint}</p>}
           <label className="check"><input type="checkbox" checked={fetchMeta} onChange={(e) => setFetchMeta(e.target.checked)} />
             Fetch PyPI metadata (network; cached 24 h)</label>
           <div className="actions">
-            <button className="btn-bone" disabled={busy}>{busy ? "Scanning..." : "Run scan"}</button>
+            <button className="btn-bone" disabled={busy}>{busy ? (isUrl(repo) ? "Cloning and scanning..." : "Scanning...") : "Run scan"}</button>
           </div>
           <p className="muted small">The backend only reads this folder. It never runs repository code during a scan and never modifies it.</p>
         </form>
@@ -306,7 +319,8 @@ function Migration({ run, health, selected, select, refresh, go, setWarn }) {
   const [exp, setExp] = useState(run.experiments?.[name] || null);
   const [busy, setBusy] = useState("");
   const [confirm, setConfirm] = useState(false);
-  const [python, setPython] = useState("3.12");
+  const [python, setPython] = useState(health?.default_python || "");
+  useEffect(() => { if (!python && health?.default_python) setPython(health.default_python); }, [health, python]);
   const poll = useRef(null);
   const aiReady = !!health?.ai?.configured;
   const ok = rec?.status === "ok";
@@ -401,6 +415,7 @@ function Migration({ run, health, selected, select, refresh, go, setWarn }) {
           {rec.recommendation.uncertainties.length > 0 && <><h4>Gemma is unsure about</h4><ul>{rec.recommendation.uncertainties.map((s, i) => <li key={i}>{s}</li>)}</ul></>}
           <p className="muted small">{rec.model_version || rec.model} · {(rec.requested_at || "").slice(0, 19)}</p>
         </details>}
+        {rec && rec.status !== "AI_UNAVAILABLE" && <GemmaProof r={rec} />}
       </section>
 
       {/* Step 2 — review */}
@@ -423,7 +438,8 @@ function Migration({ run, health, selected, select, refresh, go, setWarn }) {
           <label className="check"><input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} />
             I have read the change above. Run the tests.</label>
           <div className="actions">
-            <select value={python} onChange={(e) => setPython(e.target.value)}><option value="3.12">Python 3.12</option><option value="3.13">Python 3.13</option></select>
+            <select value={python} onChange={(e) => setPython(e.target.value)}>
+              {(health?.supported_pythons || []).map((v) => <option key={v} value={v}>Python {v}</option>)}</select>
             <button className="btn-bone" disabled={!confirm || !!busy} onClick={runTests}>Run tests on a copy</button>
             <button className="btn-line" disabled={!!busy} onClick={() => drop("Not chosen in review")}>Not this one</button>
           </div>
@@ -447,6 +463,24 @@ function Migration({ run, health, selected, select, refresh, go, setWarn }) {
       </section>}
       {exp?.state === "rejected" && <p className="note">{exp.discard_note}</p>}
     </>
+  );
+}
+
+function GemmaProof({ r }) {
+  const u = r.usage || {};
+  return (
+    <details className="more"><summary>Proof this came from Gemma 4</summary>
+      <dl className="kv">
+        <dt>Model requested</dt><dd><code>{r.model}</code> via {r.inference_method}</dd>
+        <dt>Model that answered</dt><dd><code>{na(r.model_version)}</code> <span className="muted small">(the API's own <code>modelVersion</code> field)</span></dd>
+        <dt>Requested at</dt><dd>{(r.requested_at || "").slice(0, 19)} · {na(r.latency_seconds)} s</dd>
+        <dt>Tokens</dt><dd>{na(u.promptTokenCount)} in · {na(u.candidatesTokenCount)} out{u.thoughtsTokenCount ? ` · ${u.thoughtsTokenCount} thinking` : ""}</dd>
+        <dt>Prompt SHA-256</dt><dd><code>{na(r.prompt_sha256)}</code></dd>
+        <dt>Status</dt><dd><State value={r.status} /> {r.reason || ""}</dd>
+      </dl>
+      {r.raw_text && <><h4>Raw response from the API</h4><pre className="md">{r.raw_text}</pre></>}
+      {r.evidence_sent && <><h4>Evidence GhostLib sent to Gemma</h4><pre className="md">{JSON.stringify(r.evidence_sent, null, 2)}</pre></>}
+    </details>
   );
 }
 
@@ -546,6 +580,7 @@ function Verification({ run, capsule, selected, select, go }) {
 
 function Capsule({ run, capsule, regenerate }) {
   const [md, setMd] = useState("");
+  const [live, setLive] = useState(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let alive = true;
@@ -569,6 +604,15 @@ function Capsule({ run, capsule, regenerate }) {
         <a className="btn-line" href={api.capsuleUrl(run.run_id, "md")} download>Export capsule.md</a>
         <button className="btn-line" disabled={busy} onClick={redo}>{busy ? "Regenerating..." : "Regenerate"}</button>
       </div>
+      <h3>Gemma 4 calls in this run <Chip claim="AI-RECOMMENDED" /></h3>
+      <p className="muted small">Each row is a real API request. "Model that answered" is the <code>modelVersion</code> field returned by Google's API.</p>
+      <div className="actions"><button className="btn-line" onClick={() => api.aiStatus().then(setLive).catch((e) => setLive({ status: "AI_ERROR", reason: e.message }))}>Check model live now</button>
+        {live && <span><State value={live.status} /> <code>{na(live.model_resource)}</code> {live.display_name || ""} {live.version ? `v${live.version}` : ""} {live.reason || ""}</span>}</div>
+      {(capsule.ai.calls || []).length ? <table className="cmp">
+        <thead><tr><th>When</th><th>Purpose</th><th>Package</th><th>Model that answered</th><th>Tokens in/out</th><th>Status</th></tr></thead>
+        <tbody>{capsule.ai.calls.map((c, i) => <tr key={i}><td>{(c.requested_at || "").slice(11, 19)}</td><td>{c.purpose}</td><td><code>{c.package}</code></td>
+          <td><code>{na(c.model_version_returned)}</code></td><td>{na(c.prompt_tokens)} / {na(c.output_tokens)}</td><td><State value={c.status} /></td></tr>)}</tbody>
+      </table> : <p className="empty">No Gemma calls were made in this run.</p>}
       <h3>Evidence legend</h3>
       {Object.entries(capsule.evidence_legend).map(([k, v]) => <div className="ev" key={k}><p>{v}</p><Chip claim={k} /></div>)}
       <h3>Open concerns</h3>
@@ -614,7 +658,7 @@ export default function App() {
   }, [run, loadCapsule]);
 
   useEffect(() => {
-    api.health().then(setHealth).catch((e) => setWarn(e.message));
+    api.health().then((h) => { LEGEND = h.evidence_legend || {}; setHealth(h); }).catch((e) => setWarn(e.message));
     api.listRuns().then((list) => {
       setRuns(list);
       const last = storage.get("ghostlib.run");

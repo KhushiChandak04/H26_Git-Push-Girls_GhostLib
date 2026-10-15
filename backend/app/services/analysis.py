@@ -63,6 +63,14 @@ def create_run(repository: str | Path, *, fetch_metadata: bool = True) -> dict:
     return scan
 
 
+def set_input_info(run_id: str, target: dict) -> None:
+    """Record how the repository was provided (local path or GitHub URL clone)."""
+    path = run_dir(run_id) / "scan.json"
+    scan = _read(path)
+    scan["input"] = {k: str(v) for k, v in target.items()}
+    _write(path, scan)
+
+
 def list_runs() -> list[dict]:
     out = []
     for path in sorted(runs_dir().iterdir(), reverse=True):

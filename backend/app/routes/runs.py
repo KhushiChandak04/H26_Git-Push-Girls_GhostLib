@@ -46,7 +46,10 @@ class RejectRequest(BaseModel):
 
 @router.get("/health")
 def health():
-    return {"status": "ok", "project": "GhostLib", "ai": gemma.model_info()}
+    from app.services.capsule import LEGEND, TOOL_VERSION
+    return {"status": "ok", "project": "GhostLib", "version": TOOL_VERSION, "ai": gemma.model_info(),
+            "supported_pythons": sorted(experiment.ALLOWED_PYTHONS), "default_python": experiment.DEFAULT_PYTHON,
+            "evidence_legend": LEGEND}
 
 
 @router.get("/rubric")
@@ -73,10 +76,10 @@ def list_runs():
 
 @router.post("/runs")
 def create_run(req: RunRequest):
-    path = Path(req.repository).expanduser()
-    if not path.is_dir():
-        raise HTTPException(400, f"Repository path must be an existing directory: {req.repository}")
-    run = _guard(analysis.create_run, path, fetch_metadata=req.fetch_metadata)
+    from app.services.repo_input import resolve
+    target = _guard(resolve, req.repository)
+    run = _guard(analysis.create_run, target["path"], fetch_metadata=req.fetch_metadata)
+    analysis.set_input_info(run["run_id"], target)
     generate_for_run(run["run_id"])
     return _guard(analysis.get_run, run["run_id"])
 

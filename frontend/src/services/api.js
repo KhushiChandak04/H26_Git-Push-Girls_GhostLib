@@ -25,6 +25,7 @@ async function request(path, options = {}) {
 
 export const api = {
   health: () => request("/health"),
+  aiStatus: () => request("/ai/status"),
   rubric: () => request("/rubric"),
   learning: () => request("/learning"),
   listRuns: () => request("/runs"),

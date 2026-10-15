@@ -128,7 +128,8 @@ def build_capsule(run: dict) -> dict:
         "environment": {"ghostlib_python": platform.python_version(), "platform": platform.platform(),
                         "experiment_pythons": sorted({(e.get("candidate_run") or {}).get("python_version") or "?" for e in experiments_done})},
         "ai": {**gemma.model_info(), "used_for": ["replacement recommendations", "code change proposals"],
-               "recommendations": {k: v.get("status") for k, v in recs.items()}},
+               "recommendations": {k: v.get("status") for k, v in recs.items()},
+               "calls": ai_calls(recs, exps)},
         "summary": {
             "manifests": [m["path"] for m in run.get("manifests", [])],
             "packages": len(deps),
@@ -166,6 +167,26 @@ def build_capsule(run: dict) -> dict:
         "warnings": run.get("warnings", []),
     }
     return capsule
+
+
+def _call_record(kind: str, package: str, r: dict) -> dict:
+    usage = r.get("usage") or {}
+    return {"purpose": kind, "package": package, "status": r.get("status"), "model_requested": r.get("model"),
+            "model_version_returned": r.get("model_version"), "requested_at": r.get("requested_at"),
+            "latency_seconds": r.get("latency_seconds"), "prompt_tokens": usage.get("promptTokenCount"),
+            "output_tokens": usage.get("candidatesTokenCount"), "thought_tokens": usage.get("thoughtsTokenCount"),
+            "prompt_sha256": r.get("prompt_sha256"), "finish_reason": r.get("finish_reason"),
+            "inference_method": r.get("inference_method")}
+
+
+def ai_calls(recs: dict, exps: dict) -> list[dict]:
+    """Every Gemma request recorded in this run — the audit trail proving model use."""
+    calls = [_call_record("replacement recommendation", k, v) for k, v in recs.items() if v.get("status") != "AI_UNAVAILABLE"]
+    for k, e in exps.items():
+        cp = e.get("code_proposal") or {}
+        if cp.get("status") not in (None, "not_requested", "AI_UNAVAILABLE"):
+            calls.append(_call_record("code change proposal", k, cp))
+    return sorted(calls, key=lambda c: c.get("requested_at") or "")
 
 
 def _recommendation_view(rec: dict | None) -> dict:
@@ -227,7 +248,13 @@ def capsule_markdown(c: dict) -> str:
          f"- Repository: {p.get('remote_url') or p.get('repository_path')} @ `{p.get('commit')}`",
          f"- Declared requires-python: `{p.get('declared_requires_python')}`; targets: Python 3.12 / 3.13",
          f"- AI: {c['ai']['model']} via {c['ai']['inference_method']} (configured: {c['ai']['configured']}; terms: {c['ai']['terms']})",
-         "", "## Evidence legend", ""]
+         "", "## Gemma 4 calls (audit trail)", ""]
+    calls = c["ai"].get("calls") or []
+    L += [f"- {x['requested_at'][:19] if x.get('requested_at') else '?'} · {x['purpose']} for `{x['package']}` · "
+          f"status `{x['status']}` · model returned `{x.get('model_version_returned')}` · "
+          f"{x.get('prompt_tokens')} prompt / {x.get('output_tokens')} output tokens · {x.get('latency_seconds')} s · "
+          f"prompt sha256 `{(x.get('prompt_sha256') or '')[:12]}`" for x in calls] or ["- No Gemma calls in this run."]
+    L += ["", "## Evidence legend", ""]
     L += [f"- **{k}** — {v}" for k, v in c["evidence_legend"].items()]
     s = c["summary"]
     L += ["", "## Summary", "", f"- Manifests: {', '.join(f'`{m}`' for m in s['manifests'])}",

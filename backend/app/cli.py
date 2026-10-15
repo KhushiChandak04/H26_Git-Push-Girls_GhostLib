@@ -26,7 +26,12 @@ def _print(data) -> None:
 
 
 def cmd_scan(args) -> int:
-    run = analysis.create_run(args.repository, fetch_metadata=not args.no_metadata)
+    from app.services.repo_input import resolve
+    target = resolve(args.repository)
+    if target["source"] == "github":
+        print(f"Cloned {target['input']} -> {target['path']} ({target.get('clone')})")
+    run = analysis.create_run(target["path"], fetch_metadata=not args.no_metadata)
+    analysis.set_input_info(run["run_id"], target)
     rid = run["run_id"]
     print(f"Run {rid}: {len(run['manifests'])} manifests, {len(run['packages'])} packages, "
           f"{run['source_files_scanned']} Python files scanned (commit {(run.get('git') or {}).get('commit')})")
