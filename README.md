@@ -1,114 +1,171 @@
 # GhostLib
 
-**Evidence-first dependency resilience and migration analysis.**
+**Evidence-first dependency resilience.** GhostLib scans a real Python repository, shows the evidence behind every
+dependency risk, asks **Gemma 4** for a migration plan, runs **baseline-versus-candidate tests in a disposable
+workspace**, and writes a reusable **Dependency Exit Capsule** that says exactly what was proven and what was not.
 
-GhostLib is a local-first Python/React starter for inspecting dependency declarations, mapping best-effort static imports, collecting optional package metadata, and generating a reusable Dependency Exit Capsule.
+> Most tools tell you a library is risky. GhostLib shows you the evidence, experiments with a replacement, and tells
+> you exactly what was proven and what remains uncertain.
 
-> **Status:** Initial implementation. This is not yet a complete AI migration agent. Gemma 4 recommendations, safe migration execution, and baseline-versus-candidate test execution remain unfinished.
+Built for the hackathon's Track 1 (Gemma 4: Dependency Resilience). The target repository is
+[rishrek/LinkWatch](https://github.com/rishrek/LinkWatch), which is analysed dynamically. No findings are hard-coded.
 
-## Implemented now
+## Evidence labels
 
-- CLI and FastAPI endpoint for scanning a local repository.
-- `requirements*.txt` and common PEP 621 / Poetry sections in `pyproject.toml`.
-- Manifest path, declaration, line (where available), group and manifest SHA-256 evidence.
-- Best-effort Python AST import mapping with a small alias map.
-- Explainable triage indicators; no invented numeric risk score.
-- Optional PyPI JSON metadata provider, **off by default**.
-- JSON and Markdown Dependency Exit Capsule generation.
-- Disposable workspace copy creation (does not run code or migration commands).
-- Migration plan shape validation and test-result summary comparison helpers.
-- React/Vite dashboard with Overview scan form and scaffold pages for the remaining workflows.
-- Detailed project checklist in `docs/IMPLEMENTATION_CHECKLIST.md`.
+Every statement in the dashboard and the capsule carries one of these labels:
 
-## Not implemented yet
+| Label | Meaning |
+|---|---|
+| **OBSERVED** | Read directly from repository files (manifests, Python AST) or git metadata |
+| **SOURCED** | Retrieved from PyPI's JSON API. The URL and retrieval time are recorded |
+| **EXECUTION-VERIFIED** | Produced by a command GhostLib actually ran. The argv, exit code and full log are recorded |
+| **AI-RECOMMENDED** | Suggested by Gemma 4. Schema-validated, but not established as true |
+| **UNKNOWN** | Could not be established, or not tested |
 
-- Gemma 4 inference adapter.
-- Reliable complete dependency graph and all manifest/lockfile formats.
-- Automated replacement discovery and compatibility evaluation.
-- Migration edits, package installation, isolated baseline/candidate test execution.
-- Full behavioural equivalence checking and adaptive regression-test generation.
-- Completed frontend workflows for migration, verification and capsule download.
+## What it does
 
-Do not claim these features are complete until implemented and tested.
+1. **Scan (OBSERVED):** finds `requirements*.txt` and `pyproject.toml` recursively, skipping venvs and build dirs. It records:
+   - every declaration with file and line;
+   - every import with file, line, statement and the symbols used (e.g. `toml.load`);
+   - private-API use and undeclared imports;
+   - conflicting declarations and commented-out requirements;
+   - which tests reach each usage, through direct, transitive and function-level imports.
+2. **Metadata (SOURCED):** fetches PyPI facts for the latest release and the pinned version: release dates,
+   `Requires-Python`, classifiers and yanked status. Responses are cached for 24 h in `artifacts/cache/pypi`.
+3. **Risk (rule-based):** a transparent points rubric (`backend/app/services/risk_engine.py`). Each indicator shows its
+   evidence, type and points. It is not a probability, not proof of abandonment, and excludes vulnerability data.
+4. **Gemma 4 (AI-RECOMMENDED):** receives only the collected evidence and returns candidates, migration steps,
+   breaking changes, suggested tests and uncertainties.
+   - The output is validated with a strict Pydantic schema.
+   - Candidate packages are then checked deterministically: PyPI existence, declared Python 3.12/3.13 support,
+     stdlib presence.
+   - Failures surface as `AI_UNAVAILABLE` / `AI_ERROR` / `AI_INVALID_OUTPUT`. Output is never invented.
+5. **Migration Flight Simulator (EXECUTION-VERIFIED):** **propose → review diff → approve → run → compare**.
+   - Manifest edits are deterministic. Code edits for replacements come from Gemma and are limited to the affected
+     files plus one new `tests/test_ghostlib_*.py`.
+   - Approval records the reviewer and the diff's SHA-256.
+   - The baseline and the candidate each run in their own disposable copy and uv virtualenv.
+   - The comparison covers per-test outcomes (fixed / regression / still failing), installed-version changes and
+     warnings, plus a check that the original repository is unchanged.
+6. **Dependency Exit Capsule:** `capsule.json` + `capsule.md` per run. They contain:
+   - dependency details, risk indicators and usage locations;
+   - the proposed replacement, migration steps and suggested tests;
+   - the diff, the exact commands and the test results;
+   - compatibility gaps, open concerns and limitations;
+   - reproduction and rollback instructions.
+
+### Example: real result on LinkWatch (`f52f393`, Python 3.12.14)
+
+| | Tests | Notes |
+|---|---|---|
+| Baseline (`Jinja2==2.11.3`) | 9 passed, 1 failed | `test_report` fails because `jinja2` imports `soft_unicode`, which `markupsafe` 3.x removed |
+| Candidate (`Jinja2==3.1.6`) | 10 passed | 1 fixed, 0 regressions; original repository verified unchanged |
+
+Other findings from the same scan:
+- `certifi` is imported but not declared.
+- `pydantic` is declared `==1.10.13` in `requirements.txt` but `>=2` in `pyproject.toml`.
+- `requests` private API `_parse_content_type_header` is used, and `requests.Session.request` is monkey-patched.
+- `toml` and `appdirs` have had no release since 2020.
+- `idna` and `six` are declared but never imported.
+- `nose==1.3.7` crashes on Python 3.12 (`No module named 'imp'`).
 
 ## Requirements
 
-- Python 3.12 (recommended for the event target).
-- Node.js 18+ for the dashboard.
-- Network access is only needed if you explicitly request PyPI metadata.
+- Python **3.12 or 3.13** (not 3.14)
+- [uv](https://docs.astral.sh/uv/) for experiment virtualenvs. It downloads Python 3.12/3.13 automatically if needed.
+  Without uv, GhostLib falls back to `venv` + `pip` using its own interpreter version.
+- Node.js 18+ for the dashboard
+- Network access for PyPI metadata and the Gemma API (both optional; the scan still works without them)
 
-## Backend setup
-
-From the project root:
+## Setup
 
 ```bash
 python -m venv .venv
-# Windows PowerShell:
-.venv\\Scripts\\Activate.ps1
-# macOS/Linux:
-source .venv/bin/activate
-
-python -m pip install -r backend/requirements.txt
+# Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
+pip install -e ".[dev]"
+python -m pytest            # GhostLib's own tests
+git clone https://github.com/rishrek/LinkWatch.git targets/LinkWatch   # targets/ is git-ignored
 ```
 
-Run the tests:
+### Gemma 4 configuration
+
+GhostLib uses **Gemma 4 via the Google AI Studio / Gemini API** (REST `v1beta/models/{model}:generateContent`).
 
 ```bash
-cd backend
-python -m pytest
-cd ..
+cp backend/.env.example backend/.env    # git-ignored; put your key here, never commit it
+# GEMINI_API_KEY=...                    # https://aistudio.google.com/apikey
+# GEMMA_MODEL=gemma-4-26b-a4b-it        # default; gemma-4-31b-it also works
+ghostlib ai-check                       # verifies the model is reachable and records its resource name
 ```
 
-Run the API from the project root:
-
-```bash
-uvicorn app.main:app --app-dir backend --reload
-```
-
-API base: `http://127.0.0.1:8000`; interactive docs: `http://127.0.0.1:8000/docs`.
+- **Model:** `gemma-4-26b-a4b-it` by default, configurable with `GEMMA_MODEL`. The exact `modelVersion` returned by the
+  API is stored with every response.
+- **Access method:** Google AI Studio API key, hosted inference.
+- **Terms:** Gemma is provided under the [Gemma Terms of Use](https://ai.google.dev/gemma/terms). Use of the API is
+  also subject to the Gemini API terms.
+- **What is sent:** only the collected evidence. That means declarations, PyPI facts, risk indicators, usage
+  locations with short snippets, and the bodies of functions that use the dependency. For code-change proposals, the
+  full content of the affected source files is sent too.
+- **Fallback:** without a key, every AI step reports `AI_UNAVAILABLE`. Scanning, metadata, risk, deterministic upgrade
+  and removal experiments, and the capsule all keep working.
 
 ## CLI
 
 ```bash
-PYTHONPATH=backend python -m app.cli /absolute/path/to/LinkWatch --out artifacts
+ghostlib scan targets/LinkWatch                      # scan + PyPI + risk + capsule
+ghostlib scan targets/LinkWatch --recommend          # ... + Gemma 4 for every package with score >= 1
+ghostlib recommend <run-id> toml                     # Gemma 4 for one package
+ghostlib experiment <run-id> jinja2                  # propose: prints the diff, executes nothing
+ghostlib experiment <run-id> jinja2 --approve        # run baseline + candidate tests (Python 3.12)
+ghostlib experiment <run-id> jinja2 --approve --python 3.13
+ghostlib experiment <run-id> toml --candidate tomllib --kind stdlib   # replacement with Gemma code edits
+ghostlib experiment <run-id> jinja2 --reject         # discard the candidate workspace
+ghostlib capsule <run-id>                            # regenerate capsule.json / capsule.md
+ghostlib runs
 ```
 
-Windows PowerShell:
+Artifacts are written to `artifacts/runs/<run-id>/`: `scan.json`, `recommendations/`, `baseline-py3.12/`,
+`experiments/<pkg>/` (diff, logs, junit, workspace) and `capsule/`.
 
-```powershell
-$env:PYTHONPATH = "backend"
-python -m app.cli "C:\\absolute\\path\\to\\LinkWatch" --out artifacts
-```
-
-This writes `dependency-exit-capsule.json` and `dependency-exit-capsule.md`.
-
-Optional metadata fetch (makes network requests to PyPI; only use if event rules permit):
+## Dashboard
 
 ```bash
-PYTHONPATH=backend python -m app.cli /absolute/path/to/LinkWatch --out artifacts --fetch-metadata
+uvicorn app.main:app --app-dir backend --port 8000      # API + docs at http://127.0.0.1:8000/docs
+cd frontend && npm ci && npm run dev                    # http://localhost:5173
 ```
 
-## Frontend
+The dashboard has five pages:
+1. **Overview:** scan form, run history, risk ranking and repository findings.
+2. **Dependency Explorer:** declarations, PyPI facts, indicators with evidence, usage locations with a source viewer,
+   and relevant tests.
+3. **Migration Workbench:** Gemma recommendation with validation, candidate choice, the diff, and the approval
+   checkbox with Approve or Reject.
+4. **Verification Center:** baseline vs candidate, the per-test table, command logs and warnings.
+5. **Exit Capsule:** the rendered report with JSON and Markdown downloads.
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+Set `VITE_API_BASE` if the API is not on `http://127.0.0.1:8000/api`.
 
-By default, the UI expects the backend at `http://127.0.0.1:8000/api`. Set `VITE_API_BASE` to override it.
+## Safety and isolation (what is and is not provided)
 
-## Safety
+- Scans read files only. GhostLib never writes to the target repository. After each experiment it compares
+  `git status --porcelain` and the manifest SHA-256 hashes before and after.
+- Experiments run in **disposable copies** (without `.git`) with **separate virtualenvs**. Commands are fixed argv
+  lists with no shell, run with timeouts, and must stay inside the run directory. The environment is allow-listed,
+  so API keys and git credentials are not passed to tests.
+- **This is not a security sandbox.** The target's tests execute as the current OS user and have network access. Only
+  run GhostLib against repositories you trust.
+- Nothing is merged automatically. To adopt a candidate, review `experiments/<pkg>/proposal.diff` and apply it yourself.
+- Model output never becomes a shell command.
 
-- The scanner reads files but does not execute repository code.
-- Workspace creation copies files and excludes common VCS/cache/environment folders.
-- This starter does not install packages or execute migration commands.
-- Before enabling command execution, implement strict allowlists, timeouts, environment isolation, resource limits, process cleanup and full execution logs.
-- Do not commit secrets or API keys.
+## Known limitations
 
-## Event compliance
-
-The event brief requires a specific starter/fork submission workflow; confirm the required repository lineage and naming with organizers. Confirm the allowed Gemma 4 inference method because hosted inference may conflict with a no-cloud-services rule. Network metadata fetching is opt-in and should only be used if permitted.
+- Parsed manifests: `requirements*.txt` and `pyproject.toml` (PEP 621, PEP 735 groups, Poetry).
+  `setup.py`/`setup.cfg`/lockfiles are listed but not parsed.
+- Static analysis misses dynamic imports. The import-to-distribution mapping uses a small curated table, and
+  heuristic matches are labelled as such.
+- Test relevance comes from the import graph, not line coverage.
+- Passing tests show no regressions in the behaviour those tests exercise. They do not prove equivalence.
+- Experiments install the root `requirements*.txt` files, falling back to `pip install -e .`.
 
 ## License
 
