@@ -1,12 +1,17 @@
 from fastapi import FastAPI
-from app.routes import scan, dependencies, migrations, capsule
+from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="GhostLib", version="0.1.0")
+from app.routes import runs
 
-app.include_router(scan.router, prefix="/api")
-app.include_router(dependencies.router, prefix="/api")
-app.include_router(migrations.router, prefix="/api")
-app.include_router(capsule.router, prefix="/api")
+app = FastAPI(title="GhostLib", version="0.2.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:4173", "http://127.0.0.1:4173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.include_router(runs.router)
+
 
 @app.get("/health")
 def health():

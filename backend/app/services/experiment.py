@@ -436,7 +436,7 @@ def approve_and_run(run_id: str, package: str, approved_by: str = "local user", 
         candidate.update(kind="candidate", evidence_type="EXECUTION-VERIFIED", completed_at=_now())
         after = _original_state(repo, scan["manifests"])
         record.update(
-            state="completed", baseline=baseline, candidate=candidate, comparison=compare(baseline, candidate),
+            state="completed", baseline_run=baseline, candidate_run=candidate, comparison=compare(baseline, candidate),
             original_repository_check={"before": before, "after": after, "unchanged": before == after},
             completed_at=_now(),
         )

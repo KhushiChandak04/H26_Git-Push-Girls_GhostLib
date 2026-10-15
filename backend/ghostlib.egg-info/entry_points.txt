@@ -1,0 +1,2 @@
+[console_scripts]
+ghostlib = app.cli:main
