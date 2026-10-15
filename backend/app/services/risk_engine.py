@@ -19,6 +19,7 @@ RUBRIC = {
     "declaration_conflict": 3,
     "pinned_python_incompatible": 3,
     "pinned_not_installable": 3,
+    "pinned_needs_source_build": 1,
     "pinned_version_yanked": 3,
     "inactive_development_status": 3,
     "no_release_in_years": 2,
@@ -35,6 +36,7 @@ RUBRIC = {
 # Plain-language description of every rule and where its input comes from (served to the UI).
 RULE_DOCS = {
     "declaration_conflict": ("OBSERVED", "Manifests", "The same package is pinned differently in two manifest files."),
+    "pinned_needs_source_build": ("SOURCED", "PyPI files", "The pinned release has no pre-built wheel for Python 3.12/3.13, only source code: installing needs a compiler and often fails (e.g. old numpy, scikit-learn)."),
     "pinned_python_incompatible": ("SOURCED", "PyPI", "The pinned version's Requires-Python excludes Python 3.12 or 3.13."),
     "pinned_not_installable": ("SOURCED", "PyPI files", "The pinned release ships no wheel or source for Python 3.12/3.13, so it cannot be installed there (checked from the actual wheel tags; common for old ML releases)."),
     "pinned_version_yanked": ("SOURCED", "PyPI", "The pinned version was yanked (or is missing) on PyPI."),
@@ -150,6 +152,12 @@ def assess_package(pkg: dict, metadata: dict | None = None) -> dict:
                                              f"Pinned version {pinned['version']} is yanked on PyPI.", psrc))
             inst = pinned.get("installable") or {}
             missing = [v for v, how in inst.items() if how == "none"]
+            source_only = [v for v, how in inst.items() if how == "source_build"]
+            if source_only:
+                indicators.append(_indicator(
+                    "pinned_needs_source_build", "SOURCED",
+                    f"Pinned {pinned['version']} has no wheel for Python {', '.join(source_only)}; only a source "
+                    "distribution, which must be compiled during install.", psrc, installable=inst))
             if missing:
                 indicators.append(_indicator(
                     "pinned_not_installable", "SOURCED",

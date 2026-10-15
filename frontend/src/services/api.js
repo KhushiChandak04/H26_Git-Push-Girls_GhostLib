@@ -44,7 +44,10 @@ export const api = {
   experiment: (id, pkg) => request(`/runs/${id}/experiments/${pkg}`),
   openInEditor: (id, file, line = 1, scope = "repo") =>
     request(`/runs/${id}/open`, { method: "POST", body: { file, line, scope } }),
-  capsule: (id) => request(`/runs/${id}/capsule`, { method: "POST" }),
+  workspaceInfo: (id, pkg) => request(`/runs/${id}/experiments/${pkg}/workspace`),
+  openWorkspace: (id, pkg) => request(`/runs/${id}/experiments/${pkg}/open-workspace`, { method: "POST" }),
+  compareFile: (id, pkg, file) => request(`/runs/${id}/experiments/${pkg}/compare`, { method: "POST", body: { file } }),
+  capsule: (id, force = false) => request(`/runs/${id}/capsule${force ? "?force=true" : ""}`, { method: "POST" }),
   capsuleUrl: (id, fmt) => `${API_BASE}/runs/${id}/capsule.${fmt}`,
   logUrl: (id, pkg, name, side) => `${API_BASE}/runs/${id}/experiments/${pkg}/logs/${name}?side=${side}`,
 };

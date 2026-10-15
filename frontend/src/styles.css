@@ -192,3 +192,9 @@ pre{max-width:100%}
 .mode{background:none;border:0;border-radius:999px;padding:.45rem 1rem;color:var(--bone);font-weight:600}
 .mode.on{background:var(--bone);color:var(--plum)}
 .scan input[aria-invalid=true]{border-color:var(--blood)}
+
+.modal-backdrop{position:fixed;inset:0;background:rgba(10,5,8,.72);display:grid;place-items:center;z-index:50;padding:1rem}
+.modal{background:var(--plum);border:2px solid var(--bone);box-shadow:8px 8px 0 var(--blood);max-width:640px;width:100%;max-height:90vh;overflow:auto;padding:1.4rem 1.6rem}
+.modal h2{margin-top:0}
+.modal code,.modal p{overflow-wrap:anywhere}
+.modal{overflow-x:hidden}

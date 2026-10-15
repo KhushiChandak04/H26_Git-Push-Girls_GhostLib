@@ -376,6 +376,7 @@ function Migration({ run, health, selected, select, refresh, go, setWarn }) {
   const [exp, setExp] = useState(run.experiments?.[name] || null);
   const [busy, setBusy] = useState("");
   const [confirm, setConfirm] = useState(false);
+  const [adoptOpen, setAdoptOpen] = useState(false);
   const [python, setPython] = useState(health?.default_python || "");
   useEffect(() => { if (!python && health?.default_python) setPython(health.default_python); }, [health, python]);
   const poll = useRef(null);
@@ -513,7 +514,8 @@ function Migration({ run, health, selected, select, refresh, go, setWarn }) {
           issue(s) on OSV.dev; see the Capsule for which ones this candidate's version is past the fix for.</p>}
         <p>GhostLib never changes your repository. If you are happy with the result, apply the patch yourself:</p>
         <div className="actions">
-          <OpenInVSCode runId={run.run_id} file={live.diff_file} line={1} scope="run" label="Open patch in VS Code" big />
+          <button className="btn-bone" onClick={() => setAdoptOpen(true)}>Open migrated project in VS Code</button>
+          <OpenInVSCode runId={run.run_id} file={live.diff_file} line={1} scope="run" label="Open the patch file" />
           <button className="btn-line" onClick={() => go("Verification", name)}>See full test comparison</button>
         </div>
         <pre>{`cd "${run.repository}"\ngit apply "${live.diff_file}"`}</pre>
@@ -521,6 +523,7 @@ function Migration({ run, health, selected, select, refresh, go, setWarn }) {
           {" "}removes the temporary folder and its virtualenv to free disk space. The results stay in the report.</p>
       </section>}
       {exp?.state === "rejected" && <p className="note">{exp.discard_note}</p>}
+      {adoptOpen && live?.state === "completed" && <AdoptModal runId={run.run_id} pkg={name} onClose={() => setAdoptOpen(false)} />}
     </>
   );
 }
@@ -541,6 +544,59 @@ function GemmaProof({ r }) {
       {r.raw_text && <><h4>Raw response from the API</h4><pre className="md">{r.raw_text}</pre></>}
       {r.evidence_sent && <><h4>Evidence GhostLib sent to Gemma</h4><pre className="md">{JSON.stringify(r.evidence_sent, null, 2)}</pre></>}
     </details>
+  );
+}
+
+function AdoptModal({ runId, pkg, onClose }) {
+  const [info, setInfo] = useState(null);
+  const [error, setError] = useState("");
+  const [opened, setOpened] = useState(null);
+  const [compared, setCompared] = useState({});
+  useEffect(() => {
+    api.workspaceInfo(runId, pkg).then(setInfo).catch((e) => setError(e.message));
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [runId, pkg, onClose]);
+  const open = async () => {
+    setOpened({ busy: true });
+    try { setOpened(await api.openWorkspace(runId, pkg)); } catch (e) { setOpened({ opened: false, reason: e.message }); }
+  };
+  const compare = async (file) => {
+    try { const r = await api.compareFile(runId, pkg, file); setCompared((c) => ({ ...c, [file]: r.opened ? "opened" : r.reason })); }
+    catch (e) { setCompared((c) => ({ ...c, [file]: e.message })); }
+  };
+  const ok = info?.tests?.status === "passed";
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="adopt-title" onClick={(e) => e.stopPropagation()}>
+        <h2 id="adopt-title">Open the migrated project</h2>
+        {error && <p className="note">{error}</p>}
+        {!info && !error && <p className="muted">Preparing the migrated copy...</p>}
+        {info && <>
+          <p>This opens a <b>new VS Code window</b> on the tested copy of your project, with the new libraries already applied.
+            Your original repository is not changed.</p>
+          <p><State value={info.tests.status} /> Tests in this copy: {na(info.tests.summary)}
+            {!ok && <span className="muted small"> (failures listed in the Verification tab; some may predate the migration)</span>}</p>
+          <ul className="plain">
+            <li>✓ <b>Source Control</b> (Ctrl+Shift+G) lists every change against the original ({info.git_changes.length} file{info.git_changes.length === 1 ? "" : "s"}).</li>
+            <li>✓ The Python interpreter is set to the environment where these tests ran{info.interpreter ? "" : " (not available: the test environment was deleted)"}, so imports of the new libraries resolve.</li>
+            <li>✓ Testing is configured for pytest, so you can re-run the tests from VS Code.</li>
+          </ul>
+          <h4>Changed files</h4>
+          <ul className="plain">{info.changed_files.map((f) => <li key={f}><code>{f}</code>{" "}
+            <button type="button" className="link" onClick={() => compare(f)}>compare with original</button>
+            {compared[f] && <span className="muted small"> {compared[f] === "opened" ? "✓ opened side by side" : compared[f]}</span>}</li>)}</ul>
+          <p className="muted small">Folder: <code>{info.workspace}</code></p>
+        </>}
+        <div className="actions">
+          <button className="btn-bone" disabled={!info || opened?.busy} onClick={open}>{opened?.busy ? "Opening..." : "Open in VS Code"}</button>
+          <button className="btn-line" onClick={onClose}>Close</button>
+          {opened?.opened && <span className="muted small">✓ Opened. Look for the new VS Code window.</span>}
+          {opened && opened.opened === false && <span className="muted small">{opened.reason}</span>}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -703,8 +759,8 @@ export default function App() {
   const [warn, setWarn] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const loadCapsule = useCallback(async (id) => {
-    try { setCapsule((await api.capsule(id)).capsule); } catch (e) { setWarn(e.message); }
+  const loadCapsule = useCallback(async (id, force = false) => {
+    try { setCapsule((await api.capsule(id, force)).capsule); } catch (e) { setWarn(e.message); }
   }, []);
   const openRun = useCallback(async (id) => {
     setLoading(true); setWarn(null);
@@ -764,7 +820,7 @@ export default function App() {
         {run && tab === "Dependencies" && <Dependencies run={run} selected={selected} select={setSelected} />}
         {run && tab === "Migration" && <Migration run={run} health={health} selected={selected} select={setSelected} refresh={refresh} go={go} setWarn={setWarn} />}
         {run && tab === "Verification" && <Verification run={run} capsule={capsule} selected={selected} select={setSelected} go={go} />}
-        {run && tab === "Capsule" && <Capsule run={run} capsule={capsule} regenerate={() => loadCapsule(run.run_id)} />}
+        {run && tab === "Capsule" && <Capsule run={run} capsule={capsule} regenerate={() => loadCapsule(run.run_id, true)} />}
       </main>
     </>
   );

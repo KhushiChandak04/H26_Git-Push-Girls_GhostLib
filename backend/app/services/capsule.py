@@ -401,6 +401,24 @@ def write_capsule(capsule: dict, output_dir: Path | str) -> list[str]:
     return [str(json_path), str(md_path)]
 
 
+def _run_mtime(run_dir: Path) -> float:
+    paths = [run_dir / "scan.json", run_dir / "ai_calls.jsonl"]
+    paths += list((run_dir / "recommendations").glob("*.json")) if (run_dir / "recommendations").is_dir() else []
+    paths += list((run_dir / "experiments").glob("*/experiment.json")) if (run_dir / "experiments").is_dir() else []
+    return max((p.stat().st_mtime for p in paths if p.is_file()), default=0.0)
+
+
+def capsule_for_run(run_id: str) -> dict:
+    """Return the run's capsule, regenerating it only if any run file is newer (cheap on repeat views)."""
+    from app.services import analysis
+    rdir = analysis.run_dir(run_id)
+    cap = rdir / "capsule" / "capsule.json"
+    if cap.is_file() and cap.stat().st_mtime >= _run_mtime(rdir):
+        return {"capsule": json.loads(cap.read_text(encoding="utf-8")),
+                "files": [str(cap), str(rdir / "capsule" / "capsule.md")], "cached": True}
+    return {**generate_for_run(run_id), "cached": False}
+
+
 def generate_for_run(run_id: str) -> dict:
     from app.services import analysis
     run = analysis.get_run(run_id)

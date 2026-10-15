@@ -30,6 +30,8 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 
+from packaging.utils import canonicalize_name
+
 from app.services import analysis, gemma
 from app.services.metadata import get_package_metadata
 
@@ -141,7 +143,8 @@ def prepare_and_test(workspace: Path, venv: Path, log_dir: Path, boundary: Path,
     commands.append(run_command(install, workspace, log_dir, "02-install", INSTALL_TIMEOUT, boundary))
     if commands[-1]["exit_code"] != 0:
         record["status"] = "could_not_run"
-        record["blocker"] = "Dependency installation failed (see 02-install.log). This is itself compatibility evidence."
+        record["blocker"] = "Dependency installation failed: " + _install_reason(commands[-1]) + \
+            " (full output in 02-install.log). This is itself compatibility evidence."
         return record
     has_pytest = subprocess.run([str(py), "-c", "import pytest"], capture_output=True, timeout=60).returncode == 0
     if not has_pytest:
@@ -189,6 +192,40 @@ def _pytest_result(cmd: dict, junit: Path, log: Path) -> dict:
                    "tests_failed" if cmd["exit_code"] == 1 else
                    "collection_error" if cmd["exit_code"] == 2 else "could_not_run"),
     }
+
+
+def _install_reason(cmd: dict) -> str:
+    """The resolver's own explanation (uv prints 'cause:'/'hint:' lines), shortened for display."""
+    text = (cmd.get("stderr_tail") or "") + "\n" + (cmd.get("stdout_tail") or "")
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    picked = [l for l in lines if l.lower().startswith(("cause:", "hint:", "error:", "because", "and because"))]
+    return " ".join(picked or lines[-3:])[:600] or "no output"
+
+
+def resolve_compatible(main_req: str, bundle_names: list[str], other_reqs: list[str], python: str, workdir: Path) -> dict:
+    """Ask uv's resolver for versions of ``bundle_names`` compatible with ``main_req`` (no install).
+
+    Pinning every coupled package to its newest release is often impossible (e.g. tensorflow 2.21 needs
+    h5py<3.15). The resolver answers from real package metadata; the result is SOURCED and recorded."""
+    uv = shutil.which("uv")
+    if not uv:
+        return {"status": "unavailable", "reason": "uv is not installed; bundled packages are pinned to latest instead."}
+    workdir.mkdir(parents=True, exist_ok=True)
+    infile = workdir / "resolve.in"
+    infile.write_text("\n".join([main_req, *bundle_names, *other_reqs]) + "\n", encoding="utf-8")
+    try:
+        proc = subprocess.run([uv, "pip", "compile", str(infile), "--python-version", python, "--no-header",
+                               "--no-annotate", "--quiet"], capture_output=True, text=True, timeout=300, env=_safe_env())
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {"status": "failed", "reason": str(exc)}
+    if proc.returncode != 0:
+        return {"status": "failed", "reason": _install_reason({"stderr_tail": proc.stderr, "stdout_tail": proc.stdout})}
+    pins = {}
+    for line in proc.stdout.splitlines():
+        if "==" in line and not line.strip().startswith("#"):
+            name, ver = line.split("==", 1)
+            pins[canonicalize_name(name.strip())] = ver.strip().split(" ")[0]
+    return {"status": "resolved", "python": python, "pins": pins, "input": infile.read_text(encoding="utf-8")}
 
 
 def parse_junit(path: Path) -> dict:
@@ -296,9 +333,12 @@ def ensure_baseline(run_id: str, python: str = DEFAULT_PYTHON) -> dict:
 
 # --------------------------------------------------------------------------- proposals
 
-def _edit_manifests(repo: Path, pkg: dict, new_requirement: str | None) -> dict[str, str]:
-    """Return {relative_path: new_content} replacing (or removing) every declaration of pkg."""
-    edits: dict[str, str] = {}
+def _edit_manifests(repo: Path, pkg: dict, new_requirement: str | None,
+                    base: dict[str, str] | None = None) -> dict[str, str]:
+    """Return {relative_path: new_content} replacing (or removing) every declaration of pkg.
+
+    ``base`` holds edits already made (so several packages can be changed in one candidate)."""
+    edits: dict[str, str] = dict(base or {})
     by_file: dict[str, list[dict]] = {}
     for decl in pkg.get("declarations", []):
         by_file.setdefault(decl["source"], []).append(decl)
@@ -336,7 +376,7 @@ def _diff(repo: Path, edits: dict[str, str]) -> str:
 
 
 def propose(run_id: str, package: str, candidate: str | None = None, kind: str | None = None,
-            use_ai_code_changes: bool = True) -> dict:
+            use_ai_code_changes: bool = True, also: list[str] | None = None) -> dict:
     """Build a reviewable candidate change. Executes nothing."""
     rdir = analysis.run_dir(run_id)
     scan = json.loads((rdir / "scan.json").read_text(encoding="utf-8"))
@@ -372,15 +412,46 @@ def propose(run_id: str, package: str, candidate: str | None = None, kind: str |
         notes.append("Candidate removes the dependency declaration.")
     edits = _edit_manifests(repo, pkg, new_req)
 
+    # Stack migration: upgrade tightly coupled packages (e.g. tensorflow + keras + numpy) in the same candidate.
+    bundle, bundle_pkgs, resolution = [], [], None
+    others = list(dict.fromkeys(a for a in (also or []) if a and a != package))
+    if others:
+        bundle_set = {package, *others}
+        other_reqs = sorted({d["raw"] for p in scan["packages"] if p["normalized_name"] not in bundle_set
+                             for d in p["declarations"] if (d.get("group") or "runtime") == "runtime" and d.get("raw")})
+        resolution = resolve_compatible(new_req or package, others, other_reqs, DEFAULT_PYTHON, rdir / "experiments" / package)
+        if resolution["status"] == "resolved":
+            notes.append(f"SOURCED: uv resolved a compatible set for Python {DEFAULT_PYTHON} "
+                         f"(pinning every package to its newest release is often impossible).")
+        else:
+            notes.append(f"Resolver could not find a compatible set ({resolution.get('reason')}); "
+                         "bundled packages are pinned to their latest release instead.")
+    for other in others:
+        opkg = analysis._package(scan, other)
+        ometa = get_package_metadata(other)
+        if ometa.get("status") != "fetched":
+            raise ValueError(f"Bundled package {other} could not be validated on PyPI ({ometa.get('status')}).")
+        version = ((resolution or {}).get("pins") or {}).get(canonicalize_name(other)) or ometa["latest_version"]
+        oreq = f"{ometa['package']}=={version}"
+        edits = _edit_manifests(repo, opkg, oreq, base=edits)
+        bundle.append({"package": other, "requirement": oreq, "latest": ometa["latest_version"], "source": ometa["source"]})
+        bundle_pkgs.append(opkg)
+        why = "" if version == ometa["latest_version"] else f" (latest is {ometa['latest_version']}, not compatible)"
+        notes.append(f"Also upgrading {ometa['package']} to {version}{why} (stack migration).")
+
     code_proposal = {"status": "not_requested"}
     if kind != "upgrade" or use_ai_code_changes:
-        source_files = (pkg.get("usage") or {}).get("source_files", [])
+        source_files = sorted({f for p in [pkg, *bundle_pkgs] for f in (p.get("usage") or {}).get("source_files", [])})
         if not source_files:
             code_proposal = {"status": "not_needed",
                              "reason": f"No source file imports {package}; only manifests change."}
         elif kind in ("pypi", "stdlib") or (kind == "upgrade" and use_ai_code_changes and ai):
+            target = new_req or candidate
+            if bundle:
+                target += " together with " + ", ".join(b["requirement"] for b in bundle)
             code_proposal = gemma.propose_code_changes(
-                package=package, candidate=candidate, kind=kind,
+                package=package if not bundle else ", ".join([package] + [b["package"] for b in bundle]),
+                candidate=target, kind=kind,
                 files={f: (repo / f).read_text(encoding="utf-8", errors="replace") for f in source_files},
                 recommendation=ai)
             for change in code_proposal.get("files", []):
@@ -404,7 +475,8 @@ def propose(run_id: str, package: str, candidate: str | None = None, kind: str |
     (edir / "proposal.diff").write_text(diff, encoding="utf-8")
     record = {
         "package": package, "candidate": candidate, "kind": kind, "state": "proposed", "proposed_at": _now(),
-        "manifest_requirement": new_req, "notes": notes, "diff": diff, "diff_file": str(edir / "proposal.diff"),
+        "manifest_requirement": new_req, "bundle": bundle, "resolution": resolution, "notes": notes, "diff": diff,
+        "diff_file": str(edir / "proposal.diff"),
         "changed_files": sorted(edits), "code_proposal": {k: v for k, v in code_proposal.items() if k != "prompt"},
         "ai_recommendation_used": bool(ai), "approval": None, "isolation": ISOLATION_NOTE,
     }
@@ -457,7 +529,10 @@ def approve_and_run(run_id: str, package: str, approved_by: str = "local user", 
     _save(edir, record)
     try:
         before = _original_state(repo, scan["manifests"])
-        baseline = ensure_baseline(run_id, python)
+        # Baseline (cached per run) and candidate are independent: run them concurrently.
+        from concurrent.futures import ThreadPoolExecutor
+        pool = ThreadPoolExecutor(max_workers=1)
+        baseline_future = pool.submit(ensure_baseline, run_id, python)
         workspace = edir / "workspace"
         shutil.rmtree(workspace, ignore_errors=True)
         shutil.rmtree(edir / "venv", ignore_errors=True)
@@ -471,6 +546,8 @@ def approve_and_run(run_id: str, package: str, approved_by: str = "local user", 
         ai_tests = sorted(r for r in edits if re.match(r"^tests/test_ghostlib_[a-z0-9_]+\.py$", r))
         candidate = prepare_and_test(workspace, edir / "venv", edir / "logs", rdir, python, ai_tests)
         candidate.update(kind="candidate", evidence_type="EXECUTION-VERIFIED", completed_at=_now())
+        baseline = baseline_future.result()
+        pool.shutdown()
         after = _original_state(repo, scan["manifests"])
         record.update(
             state="completed", baseline_run=baseline, candidate_run=candidate, comparison=compare(baseline, candidate),

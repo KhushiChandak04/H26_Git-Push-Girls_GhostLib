@@ -138,7 +138,8 @@ def cmd_experiment(args) -> int:
         proposal = existing
         print(f"Approving the existing reviewed proposal (diff sha256 of {len(proposal['diff'])} chars).")
     else:
-        proposal = experiment.propose(args.run_id, args.package, candidate=args.candidate, kind=args.kind)
+        proposal = experiment.propose(args.run_id, args.package, candidate=args.candidate, kind=args.kind,
+                                      also=args.also)
     print(f"Proposed candidate: {proposal['candidate']} ({proposal['kind']})")
     for note in proposal["notes"]:
         print("  note:", note)
@@ -212,6 +213,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("package")
     p.add_argument("--candidate")
     p.add_argument("--kind", choices=["upgrade", "pypi", "stdlib", "remove"])
+    p.add_argument("--also", nargs="+", default=[], metavar="PACKAGE",
+                   help="Upgrade these packages to their latest release in the same candidate (stack migration)")
     p.add_argument("--python", default="3.12", choices=["3.12", "3.13"])
     g = p.add_mutually_exclusive_group()
     g.add_argument("--approve", action="store_true")

@@ -149,9 +149,11 @@ def learned_priority(pkg: dict, ind_stats: dict[str, dict]) -> dict:
             "basis": ("Weighted by experience: " + "; ".join(used)) if used else "No past experiments for these rules yet (neutral weights)."}
 
 
-def for_package(name: str, exps: list[dict] | None = None) -> dict:
+def for_package(name: str, exps: list[dict] | None = None, *, arms_all: dict | None = None,
+                repos: dict | None = None) -> dict:
     exps = experiences() if exps is None else exps
-    arms = [a for a in arm_stats(exps).values() if a["package"] == name]
+    arms_all = arm_stats(exps) if arms_all is None else arms_all
+    arms = [dict(a) for a in arms_all.values() if a["package"] == name]
     arms.sort(key=lambda a: (-a["ucb"], -a["value"]))
     past = [e for e in exps if e["package"] == name]
     return {
@@ -161,7 +163,7 @@ def for_package(name: str, exps: list[dict] | None = None) -> dict:
         "best_bet": arms[0] if arms else None,
         "history": [{k: e[k] for k in ("repository", "candidate", "kind", "requirement", "python", "verdict", "reward")}
                     for e in past[-10:]],
-        "repositories_declaring": len(_scanned_repos().get(name, set())),
+        "repositories_declaring": len((_scanned_repos() if repos is None else repos).get(name, set())),
     }
 
 
@@ -191,6 +193,7 @@ def summary() -> dict:
 def annotate_run(run: dict) -> None:
     """Attach learned priority and experience to each package of a run (in place)."""
     exps = experiences()
-    inds = indicator_stats(exps)
+    inds, arms_all, repos = indicator_stats(exps), arm_stats(exps), _scanned_repos()
     for pkg in run.get("packages", []):
-        pkg["learned"] = {"priority": learned_priority(pkg, inds), **for_package(pkg["normalized_name"], exps)}
+        pkg["learned"] = {"priority": learned_priority(pkg, inds),
+                          **for_package(pkg["normalized_name"], exps, arms_all=arms_all, repos=repos)}

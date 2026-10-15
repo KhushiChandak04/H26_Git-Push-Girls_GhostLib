@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
 from app.services import analysis, experiment, gemma
-from app.services.capsule import generate_for_run
+from app.services.capsule import capsule_for_run, generate_for_run
 
 router = APIRouter(prefix="/api", tags=["ghostlib"])
 
@@ -33,6 +33,7 @@ class ProposeRequest(BaseModel):
     candidate: str | None = Field(default=None, max_length=100)
     kind: str | None = Field(default=None, pattern="^(upgrade|pypi|stdlib|remove)$")
     use_ai_code_changes: bool = True
+    also: list[str] = Field(default_factory=list, max_length=20)
 
 
 class ApproveRequest(BaseModel):
@@ -87,7 +88,6 @@ def create_run(req: RunRequest):
     target = _guard(resolve, req.repository, req.mode)
     run = _guard(analysis.create_run, target["path"], fetch_metadata=req.fetch_metadata)
     analysis.set_input_info(run["run_id"], target)
-    generate_for_run(run["run_id"])
     return _guard(analysis.get_run, run["run_id"])
 
 
@@ -125,24 +125,53 @@ def open_in_editor(run_id: str, req: OpenRequest):
         raise HTTPException(404, str(exc)) from exc
 
 
+class CompareRequest(BaseModel):
+    file: str = Field(min_length=1, max_length=1000)
+
+
+@router.get("/runs/{run_id}/experiments/{package}/workspace")
+def workspace_info(run_id: str, package: str):
+    from app.services.editor import EditorError, prepare_workspace
+    try:
+        return prepare_workspace(run_id, package)
+    except EditorError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/runs/{run_id}/experiments/{package}/open-workspace")
+def open_migrated_workspace(run_id: str, package: str):
+    from app.services.editor import EditorError, open_workspace
+    try:
+        return open_workspace(run_id, package)
+    except EditorError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/runs/{run_id}/experiments/{package}/compare")
+def compare_in_editor(run_id: str, package: str, req: CompareRequest):
+    from app.services.editor import EditorError, compare_file
+    try:
+        return compare_file(run_id, package, req.file)
+    except EditorError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
 @router.post("/runs/{run_id}/recommendations/{package}")
 def recommend(run_id: str, package: str):
     result = _guard(analysis.recommend, run_id, package)
-    generate_for_run(run_id)
     return {k: v for k, v in result.items() if k != "prompt"}
 
 
 @router.post("/runs/{run_id}/recommendations")
 def recommend_all(run_id: str, min_score: int = 1):
     result = _guard(analysis.recommend_all, run_id, min_score=min_score)
-    generate_for_run(run_id)
     return result
 
 
 @router.post("/runs/{run_id}/experiments/{package}/propose")
 def propose(run_id: str, package: str, req: ProposeRequest):
     return _guard(experiment.propose, run_id, package, candidate=req.candidate, kind=req.kind,
-                  use_ai_code_changes=req.use_ai_code_changes)
+                  use_ai_code_changes=req.use_ai_code_changes, also=req.also)
 
 
 @router.post("/runs/{run_id}/experiments/{package}/approve")
@@ -155,18 +184,12 @@ def approve(run_id: str, package: str, req: ApproveRequest):
 @router.post("/runs/{run_id}/experiments/{package}/reject")
 def reject(run_id: str, package: str, req: RejectRequest):
     record = _guard(experiment.reject, run_id, package, req.reason)
-    generate_for_run(run_id)
     return record
 
 
 @router.get("/runs/{run_id}/experiments/{package}")
 def get_experiment(run_id: str, package: str):
     record = _guard(experiment.get_experiment, run_id, package)
-    if record.get("state") == "completed":
-        cap = analysis.run_dir(run_id) / "capsule" / "capsule.json"
-        if not cap.is_file() or cap.stat().st_mtime < (analysis.run_dir(run_id) / "experiments" / package /
-                                                        "experiment.json").stat().st_mtime:
-            generate_for_run(run_id)
     return record
 
 
@@ -187,8 +210,8 @@ def experiment_log(run_id: str, package: str, name: str, side: str = "candidate"
 
 
 @router.post("/runs/{run_id}/capsule")
-def capsule(run_id: str):
-    return _guard(generate_for_run, run_id)
+def capsule(run_id: str, force: bool = False):
+    return _guard(generate_for_run, run_id) if force else _guard(capsule_for_run, run_id)
 
 
 @router.get("/runs/{run_id}/capsule.{fmt}")

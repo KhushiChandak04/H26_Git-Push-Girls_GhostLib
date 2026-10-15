@@ -52,7 +52,8 @@ IMPORT_ALIASES: dict[str, list[str]] = {
     "tensorflow-aarch64": ["tensorflow"],
     "tf-nightly": ["tensorflow"],
     "tf-keras": ["tf_keras"],
-    "keras-nightly": ["keras"],
+    "keras": ["keras", "tensorflow.keras"],
+    "keras-nightly": ["keras", "tensorflow.keras"],
     "keras-preprocessing": ["keras_preprocessing"],
     "tensorflow-hub": ["tensorflow_hub"],
     "tensorflow-datasets": ["tensorflow_datasets"],
@@ -405,11 +406,13 @@ def scan_repository(repository: str | Path) -> dict:
     for rel, info in sources.items():
         for imp in info["imports"]:
             top = imp["top"]
-            candidates = import_index.get(top) or import_index.get(imp["module"]) or []
-            if not candidates:
-                for key, owners in import_index.items():
-                    if "." in key and imp["module"].startswith(key):
-                        candidates = owners
+            # Owners of the top-level module, plus owners of dotted aliases this import reaches
+            # (e.g. `from tensorflow import keras` / `tensorflow.keras.layers` also use the keras package).
+            reached = {imp["module"]} | {f"{imp['module']}.{n}" for n in imp["names"]}
+            candidates = list(dict.fromkeys(
+                (import_index.get(top) or [])
+                + [o for key, owners in import_index.items() if "." in key
+                   and any(r == key or r.startswith(key + ".") for r in reached) for o in owners]))
             symbols = sorted({u["symbol"] for u in info["symbol_uses"] if u["top"] == top})
             location = {
                 "file": rel, "line": imp["line"], "statement": imp["statement"],
