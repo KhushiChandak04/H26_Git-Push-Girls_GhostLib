@@ -137,16 +137,57 @@ def _response_text(data: dict) -> str:
     return "".join(p.get("text", "") for p in parts if not p.get("thought"))
 
 
+class FileRewrite(BaseModel):
+    path: str = Field(max_length=300)
+    new_content: str = Field(max_length=60000)
+    explanation: str = Field(max_length=1500)
+
+
+class CodeChangeProposal(BaseModel):
+    files: list[FileRewrite] = Field(default_factory=list, max_length=10)
+    notes: list[str] = Field(default_factory=list, max_length=10)
+
+
+CODE_PROMPT = """You are migrating a Python repository from the dependency `{package}` to `{candidate}` ({kind}).
+Target runtime: Python 3.12 and 3.13. Dependency manifests are already edited; do NOT include them.
+Rewrite ONLY the files below that need changes, returning the COMPLETE new content of each changed file.
+Keep behaviour identical; keep the public API of every module unchanged; change as little as possible.
+You may add ONE new regression test file at tests/test_ghostlib_{slug}.py that exercises the migrated code
+using only the standard library and pytest (no network).
+{guidance}
+Respond with ONLY JSON: {{"files": [{{"path": "...", "new_content": "...", "explanation": "..."}}], "notes": ["..."]}}
+
+FILES:
+{files}
+"""
+
+
+def propose_code_changes(*, package: str, candidate: str, kind: str, files: dict[str, str],
+                         recommendation: dict | None = None) -> dict:
+    """Ask Gemma for full-file rewrites. Output is AI-RECOMMENDED and must be reviewed before use."""
+    guidance = ""
+    if recommendation:
+        guidance = "Migration steps proposed earlier:\n- " + "\n- ".join(recommendation.get("migration_steps", []))
+    rendered = "\n\n".join(f"=== {path} ===\n{content}" for path, content in files.items())
+    prompt = CODE_PROMPT.format(package=package, candidate=candidate, kind=kind,
+                                slug=re.sub(r"[^a-z0-9]+", "_", package.lower()), guidance=guidance, files=rendered)
+    return _generate(prompt, CodeChangeProposal, "proposal", max_tokens=8192)
+
+
 def recommend_migration(evidence: dict, *, retries: int = 1) -> dict:
     """Return {status, recommendation?, raw_text, prompt, ...}. Never raises for API problems."""
+    prompt = SYSTEM_PROMPT + json.dumps(SCHEMA_HINT, indent=1) + "\n\nEVIDENCE:\n" + json.dumps(evidence, indent=1)
+    return _generate(prompt, MigrationRecommendation, "recommendation", retries=retries)
+
+
+def _generate(prompt: str, schema: type[BaseModel], key: str, *, retries: int = 1, max_tokens: int = 4096) -> dict:
     base = {"evidence_type": "AI-RECOMMENDED", **model_info(),
             "requested_at": datetime.now(timezone.utc).isoformat()}
     if not config.GEMINI_API_KEY:
         return {**base, "status": "AI_UNAVAILABLE",
                 "reason": "GEMINI_API_KEY is not set. Deterministic scan results remain valid; no AI output was generated."}
-    prompt = SYSTEM_PROMPT + json.dumps(SCHEMA_HINT, indent=1) + "\n\nEVIDENCE:\n" + json.dumps(evidence, indent=1)
     body = {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 4096}}
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": max_tokens}}
     url = f"{config.GEMMA_API_BASE}/models/{quote(config.GEMMA_MODEL)}:generateContent"
     base["prompt_sha256"] = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     base["prompt"] = prompt
@@ -173,11 +214,14 @@ def recommend_migration(evidence: dict, *, retries: int = 1) -> dict:
         meta = {"model_version": data.get("modelVersion"), "latency_seconds": elapsed,
                 "usage": usage, "raw_text": raw, "finish_reason": ((data.get("candidates") or [{}])[0]).get("finishReason")}
         try:
-            parsed = MigrationRecommendation.model_validate(_extract_json(raw))
+            parsed = schema.model_validate(_extract_json(raw))
         except (ValueError, ValidationError) as exc:
             last_error = f"Schema validation failed: {str(exc)[:800]}"
             if attempt < retries:
                 continue
             return {**base, **meta, "status": "AI_INVALID_OUTPUT", "reason": last_error}
-        return {**base, **meta, "status": "ok", "recommendation": parsed.model_dump()}
+        dumped = parsed.model_dump()
+        if key == "proposal":
+            return {**base, **meta, "status": "ok", **dumped}
+        return {**base, **meta, "status": "ok", key: dumped}
     return {**base, "status": "AI_ERROR", "reason": last_error}
