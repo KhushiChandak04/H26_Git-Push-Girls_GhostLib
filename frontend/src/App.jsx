@@ -812,7 +812,7 @@ export default function App() {
       const last = storage.get("ghostlib.run");
       const pick = list.find((r) => r.run_id === last) || list[0];
       if (pick) openRun(pick.run_id);
-    }).catch(() => {});
+    }).catch((e) => setWarn(e.message));
   }, [openRun]);
 
   const scan = async (repository, fetchMeta, mode) => {
@@ -824,7 +824,10 @@ export default function App() {
     } catch (e) { setWarn(e.message); }
   };
   const go = (next, pkg) => { if (pkg) setSelected(pkg); setTab(next); window.scrollTo(0, 0); };
-  const status = warn && !health ? "backend offline" : run ? `live · ${run.project?.name || "run"} @ ${(run.git?.commit || "").slice(0, 7)}` : "no run yet";
+  const status = health?.api_ready === false ? "API locked · owner must configure access token"
+    : warn && !health ? "backend offline"
+      : run ? `live · ${run.project?.name || "run"} @ ${(run.git?.commit || "").slice(0, 7)}`
+        : "no run yet";
 
   return (
     <>

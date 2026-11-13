@@ -79,7 +79,8 @@ def health():
     return {"status": "ok", "project": "GhostLib", "version": TOOL_VERSION, "ai": gemma.model_info(),
             "supported_pythons": sorted(experiment.ALLOWED_PYTHONS), "default_python": experiment.DEFAULT_PYTHON,
             "evidence_legend": LEGEND, "hosted_mode": config.HOSTED_MODE,
-            "auth_required": config.HOSTED_MODE}
+            "auth_required": config.HOSTED_MODE,
+            "api_ready": not config.HOSTED_MODE or bool(config.API_TOKEN)}
 
 
 @router.get("/rubric")

@@ -49,10 +49,18 @@ def test_hosted_api_fails_closed_without_token(monkeypatch):
     monkeypatch.setattr(config, "HOSTED_MODE", True)
     monkeypatch.setattr(config, "API_TOKEN", "")
 
+    assert runs.health()["api_ready"] is False
     response = _invoke(_request("/api/rubric"))
 
     assert response.status_code == 503
     assert b"GHOSTLIB_API_TOKEN" in response.body
+
+
+def test_hosted_api_is_ready_when_token_is_configured(monkeypatch):
+    monkeypatch.setattr(config, "HOSTED_MODE", True)
+    monkeypatch.setattr(config, "API_TOKEN", "test-token")
+
+    assert runs.health()["api_ready"] is True
 
 
 def test_hosted_scan_rate_limit(monkeypatch, tmp_path):
