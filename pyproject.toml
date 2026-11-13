@@ -32,3 +32,12 @@ include = ["app*"]
 testpaths = ["backend/tests"]
 pythonpath = ["backend"]
 norecursedirs = ["targets", "artifacts", "frontend", ".git", ".venv", "node_modules"]
+
+[tool.vercel]
+entrypoint = "server:app"
+
+[tool.vercel.scripts]
+build = "npm ci --prefix frontend && npm run build --prefix frontend"
+
+[tool.vercel.fastapi.static]
+cdn = true

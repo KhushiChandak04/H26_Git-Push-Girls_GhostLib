@@ -1,17 +1,38 @@
 """REST API for the dashboard. Thin wrappers over the same services the CLI uses."""
 from __future__ import annotations
 
-import json
+import time
+from collections import defaultdict
 from pathlib import Path
+from threading import Lock
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
+from app import config
 from app.services import analysis, experiment, gemma
 from app.services.capsule import capsule_for_run, generate_for_run
 
 router = APIRouter(prefix="/api", tags=["ghostlib"])
+_SCAN_WINDOW_SECONDS = 900
+_SCAN_LIMIT = 5
+_scan_requests: dict[tuple[str, int], int] = defaultdict(int)
+_scan_requests_lock = Lock()
+
+
+def _enforce_scan_rate_limit(client_ip: str) -> None:
+    if not config.HOSTED_MODE:
+        return
+    window = int(time.monotonic() // _SCAN_WINDOW_SECONDS)
+    with _scan_requests_lock:
+        expired = [key for key in _scan_requests if key[1] < window - 1]
+        for key in expired:
+            del _scan_requests[key]
+        key = (client_ip, window)
+        if _scan_requests[key] >= _SCAN_LIMIT:
+            raise HTTPException(429, "Hosted scan limit reached for the current 15-minute window.")
+        _scan_requests[key] += 1
 
 
 def _guard(fn, *args, **kwargs):
@@ -57,7 +78,8 @@ def health():
     from app.services.capsule import LEGEND, TOOL_VERSION
     return {"status": "ok", "project": "GhostLib", "version": TOOL_VERSION, "ai": gemma.model_info(),
             "supported_pythons": sorted(experiment.ALLOWED_PYTHONS), "default_python": experiment.DEFAULT_PYTHON,
-            "evidence_legend": LEGEND}
+            "evidence_legend": LEGEND, "hosted_mode": config.HOSTED_MODE,
+            "auth_required": config.HOSTED_MODE}
 
 
 @router.get("/rubric")
@@ -83,7 +105,9 @@ def list_runs():
 
 
 @router.post("/runs")
-def create_run(req: RunRequest):
+def create_run(req: RunRequest, request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    _enforce_scan_rate_limit(client_ip)
     from app.services.repo_input import resolve
     target = _guard(resolve, req.repository, req.mode)
     run = _guard(analysis.create_run, target["path"], fetch_metadata=req.fetch_metadata)

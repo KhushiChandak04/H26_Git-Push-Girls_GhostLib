@@ -97,7 +97,7 @@ function inputProblem(mode, v) {
   return "";
 }
 
-function Overview({ run, runs, openRun, scan, go }) {
+function Overview({ run, runs, openRun, scan, go, hostedMode = false }) {
   const [repo, setRepo] = useState(() => storage.get("ghostlib.repo") || "");
   const [mode, setMode] = useState(() => (isUrl(storage.get("ghostlib.repo") || "") ? "github" : "local"));
   const [fetchMeta, setFetchMeta] = useState(true);
@@ -106,6 +106,17 @@ function Overview({ run, runs, openRun, scan, go }) {
   const pkgs = run?.packages || [];
   const flagged = pkgs.filter((p) => p.assessment.score > 0).length;
   const tested = Object.values(run?.experiments || {}).filter((e) => e.state === "completed").length;
+  const availableModes = hostedMode ? ["github"] : Object.keys(MODES);
+
+  useEffect(() => {
+    if (hostedMode) {
+      setMode("github");
+      if (repo && !isUrl(repo)) {
+        setRepo("");
+        storage.set("ghostlib.repo", "");
+      }
+    }
+  }, [hostedMode, repo]);
 
   const problem = inputProblem(mode, repo);
   const submit = async (e) => {
@@ -116,7 +127,7 @@ function Overview({ run, runs, openRun, scan, go }) {
   };
   const changeRepository = (value) => {
     setRepo(value);
-    if (value.trim()) setMode(isUrl(value) ? "github" : "local");
+    if (value.trim()) setMode(hostedMode || isUrl(value) ? "github" : "local");
   };
 
   return (
@@ -138,9 +149,13 @@ function Overview({ run, runs, openRun, scan, go }) {
         <h2>Summon a scan</h2>
         <form onSubmit={submit}>
           <div className="modes" role="radiogroup" aria-label="Repository input type">
-            {Object.entries(MODES).map(([key, m]) => (
-              <button type="button" key={key} role="radio" aria-checked={mode === key} className={mode === key ? "mode on" : "mode"}
-                onClick={() => setMode(key)}>{m.label}</button>))}
+            {availableModes.map((key) => {
+              const m = MODES[key];
+              return (
+                <button type="button" key={key} role="radio" aria-checked={mode === key} className={mode === key ? "mode on" : "mode"}
+                  onClick={() => setMode(key)}>{m.label}</button>
+              );
+            })}
           </div>
           <label className="field">{MODES[mode].label}
             <input value={repo} onChange={(e) => changeRepository(e.target.value)} placeholder={MODES[mode].placeholder} required aria-invalid={!!problem} />
@@ -152,7 +167,9 @@ function Overview({ run, runs, openRun, scan, go }) {
           <div className="actions">
             <button className="btn-bone" disabled={busy || !!problem}>{busy ? MODES[mode].busy : "Run scan"}</button>
           </div>
-          <p className="muted small">The backend only reads this folder. It never runs repository code during a scan and never modifies it.</p>
+          <p className="muted small">{hostedMode
+            ? "Hosted scans accept public GitHub URLs only; the server cannot read folders on your computer."
+            : "The backend only reads this folder. It never runs repository code during a scan and never modifies it."}</p>
         </form>
         {runs.length > 0 && <>
           <h3>Previous runs</h3>
@@ -631,20 +648,24 @@ const CHANGE_WORDS = {
 const RANK = { regression: 0, missing_in_candidate: 1, fixed: 2, still_failing: 3, new_in_candidate: 4, unchanged_pass: 5 };
 const OUTCOME = { passed: "✓ pass", failed: "✗ fail", error: "✗ error", skipped: "– skip" };
 
-function Run({ title, r, runId, pkg, side }) {
+function Run({ title, r, runId, pkg, side, setWarn }) {
   if (!r) return <div className="run"><h3>{title}</h3><p className="empty">Not run.</p></div>;
+  const downloadLog = async (name) => {
+    try { await api.downloadLog(runId, pkg, name, side); } catch (e) { setWarn(e.message); }
+  };
   return (
     <div className="run">
       <h3>{title}</h3>
       <p><State value={r.status} /> {na(r.summary_line || r.blocker)} · Python {na(r.python_version)}</p>
       <dl>{r.commands.map((c) => <Fragment key={c.label}><dt><code>{c.label}</code></dt>
-        <dd>exit <code>{c.timed_out ? "timeout" : String(c.exit_code)}</code> · {c.duration_seconds}s · <a href={api.logUrl(runId, pkg, `${c.label}.log`, side)} target="_blank" rel="noreferrer">log</a></dd></Fragment>)}</dl>
+        <dd>exit <code>{c.timed_out ? "timeout" : String(c.exit_code)}</code> · {c.duration_seconds}s ·
+          {" "}<button type="button" className="link" onClick={() => downloadLog(`${c.label}.log`)}>download log</button></dd></Fragment>)}</dl>
       {(r.warnings || []).length > 0 && <><h4>Warnings</h4><ul>{r.warnings.map((w) => <li key={w} className="muted small">{w}</li>)}</ul></>}
     </div>
   );
 }
 
-function Verification({ run, capsule, selected, select, go }) {
+function Verification({ run, capsule, selected, select, go, setWarn }) {
   const exps = Object.values(run.experiments || {});
   if (!exps.length) return <>
     <h2>Test comparison</h2>
@@ -688,8 +709,8 @@ function Verification({ run, capsule, selected, select, go }) {
         {gaps.length ? <ul>{gaps.map((g, i) => <li key={i}><Chip claim={g.type} /> {g.gap}</li>)}</ul> : <p className="empty">No gaps recorded.</p>}
         <details className="more"><summary>Technical details: commands, exit codes, logs, the applied diff</summary>
           <div className="runs">
-            <Run title="Before (current dependencies)" r={e.baseline_run} runId={run.run_id} pkg={e.package} side="baseline" />
-            <Run title="After (new dependency)" r={e.candidate_run} runId={run.run_id} pkg={e.package} side="candidate" />
+            <Run title="Before (current dependencies)" r={e.baseline_run} runId={run.run_id} pkg={e.package} side="baseline" setWarn={setWarn} />
+            <Run title="After (new dependency)" r={e.candidate_run} runId={run.run_id} pkg={e.package} side="candidate" setWarn={setWarn} />
           </div>
           <p className="muted small">Approved by {e.approval?.approved_by} at {(e.approval?.approved_at || "").slice(0, 19)} · patch SHA-256 {(e.approval?.diff_sha256 || "").slice(0, 12)}</p>
           <Diff text={e.diff} />
@@ -702,17 +723,20 @@ function Verification({ run, capsule, selected, select, go }) {
 
 /* ------------------------------------------------------------------ Capsule */
 
-function Capsule({ run, capsule, regenerate }) {
+function Capsule({ run, capsule, regenerate, setWarn }) {
   const [md, setMd] = useState("");
   const [live, setLive] = useState(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let alive = true;
-    fetch(api.capsuleUrl(run.run_id, "md")).then((r) => (r.ok ? r.text() : "")).then((t) => alive && setMd(t)).catch(() => {});
+    api.capsuleMarkdown(run.run_id).then((text) => alive && setMd(text)).catch((e) => { if (alive) setWarn(e.message); });
     return () => { alive = false; };
-  }, [run.run_id, capsule?.generated_at]);
+  }, [run.run_id, capsule?.generated_at, setWarn]);
   if (!capsule) return <p className="empty">Generating the capsule...</p>;
   const redo = async () => { setBusy(true); try { await regenerate(); } finally { setBusy(false); } };
+  const exportCapsule = async (fmt) => {
+    try { await api.downloadCapsule(run.run_id, fmt); } catch (e) { setWarn(e.message); }
+  };
   return (
     <>
       <h2>Exit Capsule</h2>
@@ -724,8 +748,8 @@ function Capsule({ run, capsule, regenerate }) {
         <dt>Generated</dt><dd>{capsule.generated_at.slice(0, 19)} · run <code>{capsule.run_id}</code></dd>
       </dl>
       <div className="actions">
-        <a className="btn-bone" href={api.capsuleUrl(run.run_id, "json")} download>Export capsule.json</a>
-        <a className="btn-line" href={api.capsuleUrl(run.run_id, "md")} download>Export capsule.md</a>
+        <button type="button" className="btn-bone" onClick={() => exportCapsule("json")}>Export capsule.json</button>
+        <button type="button" className="btn-line" onClick={() => exportCapsule("md")}>Export capsule.md</button>
         <button className="btn-line" disabled={busy} onClick={redo}>{busy ? "Regenerating..." : "Regenerate"}</button>
       </div>
       <h3>Gemma 4 calls in this run <Chip claim="AI-RECOMMENDED" /></h3>
@@ -821,11 +845,12 @@ export default function App() {
       {warn && <div className="banner warn">{warn} <button className="link" onClick={() => setWarn(null)}>dismiss</button></div>}
       <main>
         {loading && <p className="empty">Summoning the run...</p>}
-        {tab === "Overview" && <Overview run={run} runs={runs} openRun={openRun} scan={scan} go={go} />}
+        {tab === "Overview" && <Overview run={run} runs={runs} openRun={openRun} scan={scan} go={go}
+          hostedMode={health?.hosted_mode} />}
         {run && tab === "Dependencies" && <Dependencies run={run} selected={selected} select={setSelected} />}
         {run && tab === "Migration" && <Migration run={run} health={health} selected={selected} select={setSelected} refresh={refresh} go={go} setWarn={setWarn} />}
-        {run && tab === "Verification" && <Verification run={run} capsule={capsule} selected={selected} select={setSelected} go={go} />}
-        {run && tab === "Capsule" && <Capsule run={run} capsule={capsule} regenerate={() => loadCapsule(run.run_id, true)} />}
+        {run && tab === "Verification" && <Verification run={run} capsule={capsule} selected={selected} select={setSelected} go={go} setWarn={setWarn} />}
+        {run && tab === "Capsule" && <Capsule run={run} capsule={capsule} regenerate={() => loadCapsule(run.run_id, true)} setWarn={setWarn} />}
       </main>
     </>
   );

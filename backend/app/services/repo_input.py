@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from app import config
 from app.config import ARTIFACTS_DIR, PROJECT_ROOT
 
 NAME = r"[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,98}[A-Za-z0-9_])?"
@@ -44,6 +45,8 @@ def resolve(value: str, mode: str | None = None) -> dict:
                              "or clone it yourself and enter the folder path.")
     if mode == "github" and not is_url:
         raise RepoInputError("You chose 'GitHub URL' but entered a local path. Switch to 'Local repository path'.")
+    if config.HOSTED_MODE and not is_url:
+        raise RepoInputError("Hosted GhostLib accepts public GitHub URLs only. Local paths remain available when running locally.")
     if is_url:
         return clone_github(raw)
     path = Path(raw).expanduser()

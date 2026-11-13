@@ -12,6 +12,16 @@ def test_local_path_ok(tmp_path):
     assert r["source"] == "local" and r["path"] == tmp_path.resolve()
 
 
+def test_hosted_mode_rejects_local_paths_but_keeps_github_input(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "HOSTED_MODE", True)
+    with pytest.raises(RepoInputError, match="Hosted GhostLib accepts public GitHub URLs only"):
+        resolve(str(tmp_path))
+
+    expected = {"path": tmp_path, "source": "github"}
+    monkeypatch.setattr(repo_input, "clone_github", lambda url: expected)
+    assert resolve("https://github.com/example/project") == expected
+
+
 @pytest.mark.parametrize("value, msg", [
     ("C:/definitely/missing/folder", "not found"),
     ("", "Enter a local repository path"),

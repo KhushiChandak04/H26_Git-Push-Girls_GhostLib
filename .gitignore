@@ -22,3 +22,4 @@ Thumbs.db
 targets/
 *.egg-info/
 backend/env
+.vercel/

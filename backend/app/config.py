@@ -23,9 +23,21 @@ def _load_env_file(path: Path) -> None:
 for _env in (PROJECT_ROOT / "backend" / ".env", PROJECT_ROOT / ".env"):
     _load_env_file(_env)
 
-_artifacts = Path(os.getenv("GHOSTLIB_ARTIFACTS_DIR", PROJECT_ROOT / "artifacts"))
+_default_artifacts = "/tmp/ghostlib-artifacts" if os.getenv("VERCEL") == "1" else PROJECT_ROOT / "artifacts"
+_artifacts = Path(os.getenv("GHOSTLIB_ARTIFACTS_DIR", _default_artifacts))
 ARTIFACTS_DIR = (_artifacts if _artifacts.is_absolute() else (PROJECT_ROOT / "backend" / _artifacts)).resolve()
 MAX_SOURCE_FILE_BYTES = int(os.getenv("GHOSTLIB_MAX_SOURCE_FILE_BYTES", "1000000"))
+HOSTED_MODE = os.getenv("GHOSTLIB_HOSTED_MODE", "").strip().lower() in {"1", "true", "yes"}
+API_TOKEN = os.getenv("GHOSTLIB_API_TOKEN", "").strip()
+_default_cors = (
+    "http://localhost:5173,http://127.0.0.1:5173,"
+    "http://localhost:4173,http://127.0.0.1:4173"
+)
+CORS_ORIGINS = tuple(
+    origin.strip().rstrip("/")
+    for origin in os.getenv("GHOSTLIB_CORS_ORIGINS", _default_cors).split(",")
+    if origin.strip()
+)
 
 # Gemma 4 via Google AI Studio (Gemini API). The key is never logged or written to artifacts.
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
